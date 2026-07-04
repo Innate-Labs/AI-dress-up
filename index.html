@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI穿搭助手 · 高保真原型总览</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101012; --muted: #8a8a8e; --line: #e8e8e5;
+    --grad: linear-gradient(96deg, #ffc9e5 0%, #ffd9c4 38%, #b9f0d2 100%);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+    background: #f4f4f1; color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  header { padding: 60px 6vw 30px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px; }
+  h1 { font-family: "Archivo Black", sans-serif; font-size: clamp(30px, 4.5vw, 52px); }
+  h1 .zh { font-family: inherit; font-weight: 900; }
+  h1 em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  header p { color: var(--muted); font-size: 15px; margin-top: 10px; }
+  .start {
+    margin-left: auto;
+    background: var(--ink); color: #fff; text-decoration: none;
+    padding: 16px 34px; border-radius: 999px;
+    font-size: 16px; font-weight: 700;
+    box-shadow: 0 10px 30px rgba(16,16,18,.2);
+  }
+  .flow-note { padding: 0 6vw 26px; color: var(--muted); font-size: 13.5px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 34px 26px;
+    padding: 10px 6vw 80px;
+  }
+  .shot { text-align: center; }
+  .phone {
+    position: relative;
+    border-radius: 34px;
+    background: #17171a;
+    padding: 10px;
+    box-shadow: 0 18px 44px rgba(16,16,18,.16);
+    transition: transform .25s ease;
+  }
+  .shot:hover .phone { transform: translateY(-6px); }
+  .phone iframe {
+    width: 100%; aspect-ratio: 393/760;
+    border: none; border-radius: 26px;
+    background: #fafaf9;
+    pointer-events: none;
+  }
+  .phone a.cover { position: absolute; inset: 0; border-radius: 34px; }
+  .shot .nm { font-size: 15.5px; font-weight: 800; margin-top: 16px; }
+  .shot .sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px;
+    background: #fff; border: 1px solid var(--line); color: var(--muted);
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>AI<span class="zh">穿搭助手</span> <em>Prototype</em></h1>
+    <p>移动端高保真可交互原型 · 对标 wearwow · 共 11 个页面，点击任意手机可进入交互</p>
+  </div>
+  <a class="start" href="login.html">▶ 从头体验完整流程</a>
+</header>
+<div class="flow-note">建议演示顺序：登录 → 新用户引导 → 首页 → 试穿 → 添加衣服 → 衣橱 → 试衣历史 → 我的（手机访问请直接打开 login.html）</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+  const PAGES = [
+    ["login.html", "登录", "一键登录 / 更多登录方式"],
+    ["signup.html", "邮箱注册", "验证码倒计时 / 协议勾选"],
+    ["onboarding.html", "新用户引导", "性别 → 职业 → 偏好 → 选单品"],
+    ["home.html", "首页", "AI 推荐卡 / 场景筛选 / 成套搭配"],
+    ["tryon.html", "模特试穿", "换装抽屉 / 逐件替换 / AI 搭配"],
+    ["outfit-detail.html", "穿搭详情", "单品清单 / 收藏 / 试穿"],
+    ["add-clothes.html", "添加衣服", "相册导入 / 扫描 / 单品识别"],
+    ["create-model.html", "创建模特", "上传提示 / 检测 / 失败弹窗"],
+    ["wardrobe.html", "衣橱", "分类筛选 / 去搭配"],
+    ["history.html", "试衣历史", "场景筛选 / 编辑删除"],
+    ["profile.html", "我的", "我的收藏 / 我的模特"],
+  ];
+  document.getElementById("grid").innerHTML = PAGES.map(([url, nm, sub]) => `
+    <div class="shot">
+      <div class="phone">
+        <iframe src="${url}" loading="lazy" scrolling="no"></iframe>
+        <a class="cover" href="${url}" title="打开 ${nm}"></a>
+      </div>
+      <div class="nm">${nm}</div>
+      <div class="sub">${sub}</div>
+      <span class="badge">${url}</span>
+    </div>`).join("");
+</script>
+</body>
+</html>

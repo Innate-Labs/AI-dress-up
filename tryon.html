@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>模特试穿 · AI穿搭助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .app { background: #eceteb; background: #ecece9; }
+  /* 模特舞台 */
+  .stage {
+    position: relative;
+    height: 56dvh;
+    display: flex; align-items: flex-end; justify-content: center;
+    background: linear-gradient(180deg, #f2f2ef 0%, #e6e6e2 100%);
+  }
+  .stage .model-img { max-height: 92%; max-width: 70%; object-fit: contain; }
+  .stage-top {
+    position: absolute; top: 8px; left: 16px; right: 16px;
+    display: flex; align-items: center; z-index: 5;
+  }
+  .model-switch {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 2px solid #fff; background: var(--fill);
+    overflow: hidden; cursor: pointer;
+    box-shadow: var(--shadow-card);
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    position: relative;
+  }
+  .model-switch img { width: 100%; height: 100%; object-fit: cover; }
+  .model-switch::after {
+    content: "⇄"; position: absolute; right: -3px; top: -3px;
+    width: 17px; height: 17px; border-radius: 50%;
+    background: var(--ink); color: #fff; font-size: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .stage-side {
+    position: absolute; right: 16px; top: 50%; transform: translateY(-70%);
+    display: flex; flex-direction: column; gap: 12px; z-index: 5;
+  }
+  .worn-strip {
+    position: absolute; left: 16px; top: 64px; z-index: 5;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .worn-strip .w {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(255,255,255,.92); box-shadow: var(--shadow-card);
+    padding: 6px; cursor: pointer;
+  }
+  .worn-strip .w img { width: 100%; height: 100%; object-fit: contain; }
+  .ai-match {
+    position: absolute; right: 16px; bottom: 14px; z-index: 5;
+    padding: 10px 16px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    box-shadow: var(--shadow-float);
+  }
+
+  /* 底部抽屉 */
+  .drawer {
+    flex: 1;
+    background: #1b1b1e; color: #fff;
+    border-radius: 26px 26px 0 0;
+    margin-top: -22px;
+    display: flex; flex-direction: column;
+    z-index: 4; position: relative;
+    min-height: 0;
+  }
+  .drawer .grab { width: 42px; height: 4.5px; border-radius: 3px; background: rgba(255,255,255,.22); margin: 10px auto 4px; }
+  .dtabs { display: flex; justify-content: center; gap: 44px; padding: 8px 0 2px; }
+  .dtabs button {
+    background: none; border: none; cursor: pointer;
+    font-family: var(--font-body);
+    color: rgba(255,255,255,.45); font-size: 16.5px; font-weight: 800;
+    padding: 6px 2px; position: relative;
+  }
+  .dtabs button.on { color: #fff; }
+  .dtabs button.on::after {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%); bottom: -3px;
+    width: 24px; height: 3px; border-radius: 2px; background: #fff;
+  }
+  .dchips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 14px 18px 4px; }
+  .dchips::-webkit-scrollbar { display: none; }
+  .dchip {
+    flex: none; border: none; cursor: pointer;
+    padding: 8px 16px; border-radius: 999px;
+    background: rgba(255,255,255,.1); color: rgba(255,255,255,.75);
+    font-size: 13px; font-weight: 600;
+  }
+  .dchip.on { background: #fff; color: var(--ink); }
+  .dgrid {
+    flex: 1; min-height: 0; overflow-y: auto;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 14px 18px calc(20px + env(safe-area-inset-bottom));
+    align-content: start;
+  }
+  .dcell {
+    background: #fff; border-radius: 14px;
+    aspect-ratio: .86; padding: 10px;
+    cursor: pointer; position: relative;
+    border: 2px solid transparent;
+  }
+  .dcell.on { border-color: #9be8bd; }
+  .dcell img { width: 100%; height: 100%; object-fit: contain; }
+  .dcell.add {
+    background: rgba(255,255,255,.08);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,.7); font-size: 26px; font-weight: 300;
+    border: 1.5px dashed rgba(255,255,255,.25);
+  }
+  .dcell .combo { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; height: 100%; align-content: center; }
+  .dcell .combo img { aspect-ratio: 1; height: auto; }
+
+  /* 替换弹层（浅色 sheet 覆盖） */
+  .swap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  .swap-cell {
+    background: var(--fill); border-radius: var(--r-md);
+    aspect-ratio: .9; padding: 16px; cursor: pointer;
+    border: 2.5px solid transparent;
+  }
+  .swap-cell.on { border-color: var(--ink); background: #fff; }
+  .swap-cell img { width: 100%; height: 100%; object-fit: contain; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="stage">
+    <div class="stage-top">
+      <button class="iconbtn" onclick="history.length > 1 ? history.back() : location.href='home.html'">‹</button>
+      <span class="grow"></span>
+      <div class="model-switch" id="modelSwitch" title="切换模特"></div>
+    </div>
+
+    <div class="worn-strip" id="wornStrip"></div>
+
+    <img class="model-img" src="assets/ph/model.svg" id="modelImg" alt="试衣模特">
+
+    <div class="stage-side">
+      <button class="iconbtn" id="btnFav" title="收藏">★</button>
+      <button class="iconbtn" id="btnSnap" title="保存到试衣历史">⬇</button>
+    </div>
+
+    <button class="btn ai-pill ai-match" id="btnAI">✦ AI 根据衣橱搭配</button>
+  </div>
+
+  <div class="drawer">
+    <div class="grab"></div>
+    <div class="dtabs">
+      <button class="on" data-t="outfit">穿搭</button>
+      <button data-t="mine">我的衣服</button>
+    </div>
+
+    <div id="paneOutfit" style="display:flex;flex-direction:column;flex:1;min-height:0">
+      <div class="dchips" id="outfitChips"></div>
+      <div class="dgrid" id="outfitGrid"></div>
+    </div>
+
+    <div id="paneMine" class="hidden" style="flex-direction:column;flex:1;min-height:0">
+      <div class="dchips" id="catChips"></div>
+      <div class="dgrid" id="mineGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 替换单品 Sheet -->
+<div class="sheet-mask" id="mask-sheetSwap" onclick="closeSheet('sheetSwap')"></div>
+<div class="sheet" id="sheetSwap">
+  <div class="sheet-grab"></div>
+  <div class="sheet-title" id="swapTitle">替换单品
+    <button class="sheet-x" onclick="closeSheet('sheetSwap')">✕</button>
+  </div>
+  <div class="swap-grid" id="swapGrid"></div>
+  <button class="btn btn-primary btn-block" id="btnSwapOk">确认</button>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  renderStatusbar();
+
+  const qs = new URLSearchParams(location.search);
+  let wearing = [];           // 当前上身的单品 id
+  let curOutfitId = null;
+
+  /* 初始状态：来自 ?outfit= 或 ?item= */
+  if (qs.get("outfit")) {
+    const o = OUTFITS.find(x => x.id === qs.get("outfit"));
+    if (o) { wearing = [...o.items]; curOutfitId = o.id; }
+  } else if (qs.get("item")) {
+    wearing = [qs.get("item")];
+  } else {
+    wearing = [...OUTFITS[0].items]; curOutfitId = OUTFITS[0].id;
+  }
+
+  /* 模特切换角标 */
+  function renderModelBadge() {
+    const s = Store.get();
+    const m = s.models.find(x => x.id === s.curModel) || s.models[0];
+    $("#modelSwitch").innerHTML = m.dataUrl ? `<img src="${m.dataUrl}">` : "👤";
+    $("#modelImg").src = m.dataUrl || "assets/ph/model.svg";
+    $("#modelImg").style.borderRadius = m.dataUrl ? "18px" : "0";
+  }
+  $("#modelSwitch").addEventListener("click", () => location.href = "create-model.html");
+
+  /* 当前上身单品条 */
+  function renderWorn() {
+    $("#wornStrip").innerHTML = wearing.map(id => {
+      const it = itemById(id);
+      return it ? `<div class="w" data-swap="${id}" title="点击替换">${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}</div>` : "";
+    }).join("");
+    $$("[data-swap]").forEach(w => w.addEventListener("click", () => openSwap(w.dataset.swap)));
+    $("#btnFav").style.color = curOutfitId && Store.get().favorites.includes(curOutfitId) ? "#101012" : "#c9c9c6";
+  }
+
+  /* ---- 穿搭 tab ---- */
+  let oFilter = "衣橱推荐";
+  function renderOutfitChips() {
+    const chips = ["衣橱推荐", "灵感"];
+    $("#outfitChips").innerHTML = chips.map(c =>
+      `<button class="dchip ${c === oFilter ? "on" : ""}" data-c="${c}">${c}</button>`).join("");
+    $$("#outfitChips .dchip").forEach(c => c.addEventListener("click", () => {
+      oFilter = c.dataset.c; renderOutfitChips(); renderOutfitGrid();
+    }));
+  }
+  function renderOutfitGrid() {
+    const w = Store.get().wardrobe;
+    const list = oFilter === "衣橱推荐"
+      ? OUTFITS.filter(o => o.items.every(i => w.includes(i)))
+      : OUTFITS.slice().reverse();
+    $("#outfitGrid").innerHTML =
+      `<div class="dcell add" onclick="location.href='add-clothes.html'">＋</div>` +
+      list.map(o => `
+        <div class="dcell ${o.id === curOutfitId ? "on" : ""}" data-o="${o.id}">
+          <div class="combo">${o.items.slice(0, 4).map(id => itemImg(itemById(id))).join("")}</div>
+        </div>`).join("");
+    $$("[data-o]").forEach(c => c.addEventListener("click", () => {
+      const o = OUTFITS.find(x => x.id === c.dataset.o);
+      wearing = [...o.items]; curOutfitId = o.id;
+      renderAll();
+      toast(`已试穿「${o.name}」`);
+    }));
+  }
+
+  /* ---- 我的衣服 tab ---- */
+  let cFilter = "全部";
+  function renderCatChips() {
+    $("#catChips").innerHTML = CATS.map(c =>
+      `<button class="dchip ${c === cFilter ? "on" : ""}" data-c="${c}">${c}</button>`).join("");
+    $$("#catChips .dchip").forEach(c => c.addEventListener("click", () => {
+      cFilter = c.dataset.c; renderCatChips(); renderMineGrid();
+    }));
+  }
+  function renderMineGrid() {
+    const list = wardrobeItems().filter(i => cFilter === "全部" || i.cat === cFilter);
+    $("#mineGrid").innerHTML =
+      `<div class="dcell add" onclick="location.href='add-clothes.html'">＋</div>` +
+      list.map(it => `
+        <div class="dcell ${wearing.includes(it.id) ? "on" : ""}" data-i="${it.id}">
+          ${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}
+        </div>`).join("");
+    $$("[data-i]").forEach(c => c.addEventListener("click", () => {
+      wearItem(c.dataset.i);
+    }));
+  }
+
+  /* 穿上单品：同类替换，不同类叠加 */
+  function wearItem(id) {
+    const it = itemById(id);
+    const same = wearing.find(w => itemById(w)?.cat === it.cat);
+    if (same === id) { wearing = wearing.filter(w => w !== id); }
+    else if (same) { wearing = wearing.map(w => (w === same ? id : w)); }
+    else { wearing = [...wearing, id]; }
+    curOutfitId = null;
+    renderAll();
+    toast(`已换上「${it.name}」`);
+  }
+
+  /* 替换弹层 */
+  let swapFrom = null, swapTo = null;
+  function openSwap(id) {
+    swapFrom = id; swapTo = null;
+    const it = itemById(id);
+    $("#swapTitle").childNodes[0].textContent = `替换${it.cat}`;
+    const options = wardrobeItems().filter(x => x.cat === it.cat && x.id !== id);
+    $("#swapGrid").innerHTML = options.length ? options.map(x => `
+      <div class="swap-cell" data-s="${x.id}">${x.dataUrl ? `<img src="${x.dataUrl}">` : itemImg(x)}</div>`).join("")
+      : `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 0">衣橱里没有其他${it.cat}了<br>点底部 + 号上传吧</div>`;
+    $$("[data-s]").forEach(c => c.addEventListener("click", () => {
+      $$(".swap-cell").forEach(x => x.classList.remove("on"));
+      c.classList.add("on");
+      swapTo = c.dataset.s;
+    }));
+    openSheet("sheetSwap");
+  }
+  $("#btnSwapOk").addEventListener("click", () => {
+    if (!swapTo) { toast("请先选择要替换的单品"); return; }
+    wearing = wearing.map(w => (w === swapFrom ? swapTo : w));
+    curOutfitId = null;
+    closeSheet("sheetSwap");
+    renderAll();
+    toast("替换成功");
+  });
+
+  /* AI 搭配：从衣橱随机组一套 */
+  $("#btnAI").addEventListener("click", () => {
+    const btn = $("#btnAI");
+    btn.textContent = "✦ AI 搭配中…";
+    setTimeout(() => {
+      const pool = wardrobeItems();
+      const pick = cat => {
+        const list = pool.filter(i => i.cat === cat);
+        return list.length ? list[Math.floor(Math.random() * list.length)].id : null;
+      };
+      const top = pick("上衣"), bottom = Math.random() > .4 ? pick("裤装") : pick("裙装");
+      wearing = [top, bottom, pick("鞋履"), Math.random() > .5 ? pick("包配") : null].filter(Boolean);
+      curOutfitId = null;
+      renderAll();
+      btn.innerHTML = "✦ AI 根据衣橱搭配";
+      toast("AI 已为你搭配一套新造型");
+    }, 900);
+  });
+
+  /* 收藏 & 保存历史 */
+  $("#btnFav").addEventListener("click", () => {
+    if (!curOutfitId) { toast("自由搭配暂不支持收藏，试试保存到试衣历史"); return; }
+    const favs = Store.get().favorites;
+    const on = favs.includes(curOutfitId);
+    Store.set({ favorites: on ? favs.filter(f => f !== curOutfitId) : [...favs, curOutfitId] });
+    renderWorn();
+    toast(on ? "已取消收藏" : "已加入收藏");
+  });
+  $("#btnSnap").addEventListener("click", () => {
+    const o = OUTFITS.find(x => x.id === curOutfitId);
+    Store.set({
+      history: [{
+        id: "h" + Date.now(), outfitId: curOutfitId,
+        items: [...wearing], scene: o ? o.scene : "全部",
+        time: Date.now(),
+      }, ...Store.get().history],
+    });
+    toast("已保存到试衣历史");
+  });
+
+  /* tab 切换 */
+  $$(".dtabs button").forEach(b => b.addEventListener("click", () => {
+    $$(".dtabs button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    $("#paneOutfit").style.display = b.dataset.t === "outfit" ? "flex" : "none";
+    $("#paneMine").classList.toggle("hidden", b.dataset.t !== "mine");
+    $("#paneMine").style.display = b.dataset.t === "mine" ? "flex" : "none";
+  }));
+
+  function renderAll() {
+    renderWorn(); renderOutfitGrid(); renderMineGrid(); renderModelBadge();
+  }
+  renderOutfitChips(); renderCatChips(); renderAll();
+</script>
+</body>
+</html>

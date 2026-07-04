@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>创建我的模特 · AI穿搭助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .seg { display: flex; justify-content: center; gap: 40px; padding: 8px 0 2px; }
+  .seg button {
+    border: none; background: none; cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 16.5px; font-weight: 800; color: var(--muted);
+    padding: 6px 2px; position: relative;
+  }
+  .seg button.on { color: var(--ink); }
+  .seg button.on::after {
+    content: ""; position: absolute; left: 50%; transform: translateX(-50%); bottom: -2px;
+    width: 24px; height: 3px; border-radius: 2px; background: var(--ink);
+  }
+
+  /* 预设模特 */
+  .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 18px 24px; }
+  .preset {
+    position: relative;
+    background: var(--grad-soft);
+    border-radius: var(--r-lg);
+    aspect-ratio: .72;
+    display: flex; align-items: flex-end; justify-content: center;
+    cursor: pointer;
+    border: 2.5px solid transparent;
+    overflow: hidden;
+    box-shadow: var(--shadow-card);
+  }
+  .preset.on { border-color: var(--ink); }
+  .preset img { max-height: 92%; }
+  .preset .nm {
+    position: absolute; top: 10px; left: 12px;
+    font-size: 12.5px; font-weight: 700; color: var(--ink-2);
+  }
+
+  /* 我的照片：空状态 */
+  .my-empty { text-align: center; padding: 40px 40px 30px; }
+  .my-empty .figure {
+    width: 190px; height: 190px; margin: 0 auto 26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 65% 40%, #ffd3ea 0%, transparent 58%), var(--fill);
+    display: flex; align-items: flex-end; justify-content: center;
+    overflow: hidden;
+  }
+  .my-empty .figure img { height: 85%; }
+  .my-empty h2 { font-size: 20px; font-weight: 900; }
+  .my-empty p { color: var(--muted); font-size: 13.5px; line-height: 1.9; margin: 12px 0 24px; }
+
+  /* 我的照片：已有模特 */
+  .my-list { padding: 18px 24px; }
+  .big-photo {
+    position: relative;
+    border-radius: var(--r-lg); overflow: hidden;
+    aspect-ratio: .78; background: var(--fill);
+    box-shadow: var(--shadow-card);
+  }
+  .big-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .big-photo .del {
+    position: absolute; right: 12px; bottom: 12px;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: none; background: rgba(20,20,22,.55); color: #fff;
+    cursor: pointer; font-size: 15px;
+  }
+  .add-model {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 18px auto 0; border: none; background: none;
+    font-size: 15px; font-weight: 700; cursor: pointer; color: var(--ink);
+  }
+  .add-model .plus {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--ink); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* 上传提示 sheet */
+  .tip-sub { text-align: center; font-size: 14px; color: var(--ink-2); margin: -6px 0 18px; }
+  .good-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .good {
+    position: relative; border-radius: var(--r-md);
+    background: var(--grad-soft);
+    aspect-ratio: .8; overflow: hidden;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .good img { max-height: 88%; }
+  .good .mk, .bad .mk {
+    position: absolute; top: 0; left: 0;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 900;
+    border-radius: 0 0 12px 0;
+  }
+  .good .mk { background: #2fbf71; }
+  .good .lbl, .bad .lbl { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 700; padding: 6px 0; background: rgba(255,255,255,.82); }
+  .bad-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+  .bad {
+    position: relative; border-radius: 12px;
+    background: var(--fill); aspect-ratio: .74; overflow: hidden;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .bad img { max-height: 82%; opacity: .8; }
+  .bad .mk { background: var(--danger); width: 22px; height: 22px; font-size: 11px; }
+  .bad .lbl { font-size: 10.5px; padding: 4px 0; }
+  .sheet-note { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.8; margin-top: 14px; }
+
+  /* 检测中 */
+  .scan-veil {
+    position: fixed; inset: 0; z-index: 80;
+    background: rgba(250,250,249,.96);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+  }
+  .scan-veil.show { display: flex; }
+  .scan-box {
+    width: 180px; height: 230px; border-radius: 22px;
+    background: var(--fill);
+    display: flex; align-items: flex-end; justify-content: center;
+    position: relative; overflow: hidden; margin-bottom: 26px;
+  }
+  .scan-box img { max-height: 90%; }
+  .scan-box::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--grad);
+    animation: scanline 1.4s ease-in-out infinite;
+  }
+  @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 88%; } }
+  .scan-veil h3 { font-size: 18px; font-weight: 900; }
+  .scan-veil p { color: var(--muted); font-size: 13.5px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="pagehead">
+    <button class="iconbtn" onclick="history.length > 1 ? history.back() : location.href='profile.html'">‹</button>
+    <div class="seg grow">
+      <button data-t="preset">预设模特</button>
+      <button class="on" data-t="mine">我的照片</button>
+    </div>
+    <span style="width:40px"></span>
+  </div>
+
+  <!-- 预设模特 -->
+  <div id="panePreset" class="hidden">
+    <div class="preset-grid" id="presetGrid"></div>
+  </div>
+
+  <!-- 我的照片 -->
+  <div id="paneMine"></div>
+</div>
+
+<!-- 上传提示 Sheet -->
+<div class="sheet-mask" id="mask-sheetTip" onclick="closeSheet('sheetTip')"></div>
+<div class="sheet" id="sheetTip">
+  <div class="sheet-grab"></div>
+  <div class="sheet-title">上传提示
+    <button class="sheet-x" onclick="closeSheet('sheetTip')">✕</button>
+  </div>
+  <p class="tip-sub">请上传一张正面、半身或全身照，需穿着贴身衣物。</p>
+  <div class="good-grid">
+    <div class="good"><span class="mk">✓</span><img src="assets/ph/model.svg"><span class="lbl">全身照</span></div>
+    <div class="good"><span class="mk">✓</span><img src="assets/ph/model.svg" style="transform:scale(1.7) translateY(18%)"><span class="lbl">半身照</span></div>
+  </div>
+  <div class="bad-grid">
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scale(2.6) translateY(34%)"><span class="lbl">局部特写</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:rotate(-18deg)"><span class="lbl">复杂动作</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scaleX(-.6)"><span class="lbl">非正面</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scaleY(1.15)"><span class="lbl">遮挡过多</span></div>
+  </div>
+  <button class="btn btn-primary btn-block" id="btnCam" style="margin-bottom:12px">📷 现在拍一张</button>
+  <button class="btn btn-soft btn-block" id="btnAlbum">🖼 打开相册</button>
+  <input type="file" accept="image/*" id="fileInput" class="hidden">
+  <p class="sheet-note">本功能仅用于穿搭参考，严禁上传低俗擦边等违规内容，平台有权审核并拒绝违规内容。</p>
+</div>
+
+<!-- 检测中 -->
+<div class="scan-veil" id="scanVeil">
+  <div class="scan-box"><img id="scanImg" src="assets/ph/model.svg"></div>
+  <h3>照片检测中</h3>
+  <p>即将生成你的专属试衣模特…</p>
+</div>
+
+<!-- 检测失败弹窗 -->
+<div class="modal-mask" id="modalFail">
+  <div class="modal">
+    <h3>照片检测不合格</h3>
+    <p>照片中无人像</p>
+    <button class="btn btn-primary btn-block" onclick="closeModal('modalFail');openSheet('sheetTip')">重新上传</button>
+    <button class="link" onclick="closeModal('modalFail')">稍后再说</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  renderStatusbar();
+
+  /* tab 切换 */
+  $$(".seg button").forEach(b => b.addEventListener("click", () => {
+    $$(".seg button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    $("#panePreset").classList.toggle("hidden", b.dataset.t !== "preset");
+    $("#paneMine").classList.toggle("hidden", b.dataset.t !== "mine");
+  }));
+
+  /* 预设模特 */
+  const PRESETS = [
+    { id: "m1", name: "默认模特" }, { id: "p2", name: "高个模特" },
+    { id: "p3", name: "微胖模特" }, { id: "p4", name: "小个子模特" },
+  ];
+  function renderPresets() {
+    const s = Store.get();
+    $("#presetGrid").innerHTML = PRESETS.map(p => `
+      <div class="preset ${s.curModel === p.id ? "on" : ""}" data-p="${p.id}" data-nm="${p.name}">
+        <span class="nm">${p.name}</span>
+        <img src="assets/ph/model.svg">
+      </div>`).join("");
+    $$("[data-p]").forEach(c => c.addEventListener("click", () => {
+      const s = Store.get();
+      if (!s.models.find(m => m.id === c.dataset.p)) {
+        Store.set({ models: [...s.models, { id: c.dataset.p, name: c.dataset.nm, dataUrl: null }] });
+      }
+      Store.set({ curModel: c.dataset.p });
+      renderPresets();
+      toast(`已选用「${c.dataset.nm}」`);
+      setTimeout(() => history.back(), 700);
+    }));
+  }
+
+  /* 我的照片 */
+  function renderMine() {
+    const mine = Store.get().models.filter(m => m.dataUrl);
+    if (!mine.length) {
+      $("#paneMine").innerHTML = `
+        <div class="my-empty">
+          <div class="figure rise"><img src="assets/ph/model.svg"></div>
+          <h2 class="rise d1">一键上传我的试衣形象</h2>
+          <p class="rise d2">上传个人照片，无限搭配你的数字衣橱<br>请不要上传违规图片，我们的安全过滤系统将进行拦截</p>
+          <button class="btn btn-primary rise d3" style="padding:14px 34px" onclick="openSheet('sheetTip')">创建我的模特</button>
+        </div>`;
+    } else {
+      const s = Store.get();
+      const cur = mine.find(m => m.id === s.curModel) || mine[0];
+      $("#paneMine").innerHTML = `
+        <div class="my-list">
+          <div class="big-photo rise">
+            <img src="${cur.dataUrl}">
+            <button class="del" data-del="${cur.id}">🗑</button>
+          </div>
+          <button class="add-model rise d1" onclick="openSheet('sheetTip')"><span class="plus">＋</span>添加模特</button>
+          <div style="height:14px"></div>
+          <button class="btn btn-primary btn-block rise d2" onclick="Store.set({curModel:'${cur.id}'});toast('已设为当前模特');setTimeout(()=>history.back(),600)">确认</button>
+        </div>`;
+      $("[data-del]")?.addEventListener("click", () => {
+        Store.set({
+          models: Store.get().models.filter(m => m.id !== cur.id),
+          curModel: "m1",
+        });
+        renderMine();
+        toast("已删除该照片");
+      });
+    }
+  }
+
+  /* 拍照（演示失败路径） */
+  $("#btnCam").addEventListener("click", () => {
+    closeSheet("sheetTip");
+    $("#scanImg").src = "assets/ph/photo.svg";
+    $("#scanVeil").classList.add("show");
+    setTimeout(() => {
+      $("#scanVeil").classList.remove("show");
+      openModal("modalFail");
+    }, 1600);
+  });
+
+  /* 相册（真实选图 → 成功路径） */
+  $("#btnAlbum").addEventListener("click", () => $("#fileInput").click());
+  $("#fileInput").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    closeSheet("sheetTip");
+    const reader = new FileReader();
+    reader.onload = () => {
+      $("#scanImg").src = reader.result;
+      $("#scanVeil").classList.add("show");
+      setTimeout(() => {
+        $("#scanVeil").classList.remove("show");
+        const id = "u" + Date.now();
+        Store.set({
+          models: [...Store.get().models, { id, name: "我的模特", dataUrl: reader.result }],
+          curModel: id,
+        });
+        toast("模特创建成功");
+        renderMine();
+      }, 1800);
+    };
+    reader.readAsDataURL(f);
+  });
+
+  renderPresets(); renderMine();
+</script>
+</body>
+</html>

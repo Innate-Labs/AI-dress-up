@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>添加衣服 · AI穿搭助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .app { background: #141416; }
+  .app::before { display: none; }
+
+  /* 入口页（深色，像相机弹层） */
+  .entry { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 24px calc(30px + env(safe-area-inset-bottom)); }
+  .entry .down { text-align: center; color: rgba(255,255,255,.5); font-size: 22px; margin-bottom: 26px; cursor: pointer; }
+  .entry h1 { color: #fff; font-size: 24px; font-weight: 900; margin-bottom: 20px; }
+  .ways { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+  .way {
+    background: rgba(255,255,255,.09);
+    border: none; border-radius: var(--r-lg);
+    padding: 26px 0 20px; cursor: pointer;
+    color: rgba(255,255,255,.85);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    font-size: 14px; font-weight: 600; font-family: var(--font-body);
+    transition: background .15s ease;
+  }
+  .way:active { background: rgba(255,255,255,.16); }
+  .way .ic { font-size: 26px; }
+  .mailbox {
+    background: rgba(255,255,255,.09);
+    border-radius: var(--r-lg);
+    padding: 18px;
+    color: rgba(255,255,255,.85);
+  }
+  .mailbox .t { display: flex; gap: 10px; align-items: center; font-size: 15px; font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.12); }
+  .mailbox .addr { display: flex; justify-content: space-between; align-items: center; padding-top: 12px; font-size: 13.5px; color: rgba(255,255,255,.65); }
+  .mailbox .copy { border: none; background: none; color: #fff; cursor: pointer; font-size: 15px; }
+
+  /* 阶段容器 */
+  .stage-page { flex: 1; display: none; flex-direction: column; background: var(--bg); border-radius: 0; }
+  .stage-page.on { display: flex; }
+
+  /* 扫描中 */
+  .scanning { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 40px; }
+  .scan-frame {
+    position: relative; width: 230px; height: 260px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 28px;
+  }
+  .scan-frame .corner { position: absolute; width: 34px; height: 34px; border: 4px solid var(--ink); }
+  .corner.tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 14px 0 0 0; }
+  .corner.tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 14px 0 0; }
+  .corner.bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 14px; }
+  .corner.br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 14px 0; }
+  .scan-frame .pic {
+    width: 190px; height: 220px; border-radius: 18px;
+    background: var(--card); box-shadow: var(--shadow-card);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; position: relative;
+  }
+  .scan-frame .pic img { max-width: 86%; max-height: 86%; object-fit: contain; }
+  .scan-frame .pic::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 46px; top: 0;
+    background: linear-gradient(rgba(185,240,210,0), rgba(185,240,210,.55));
+    animation: sweep 1.5s ease-in-out infinite;
+  }
+  @keyframes sweep { 0%,100% { top: -18%; } 50% { top: 92%; } }
+  .scanning h2 { font-size: 20px; font-weight: 900; }
+  .scanning p { color: var(--muted); font-size: 14px; margin: 10px 0 26px; }
+
+  /* 识别结果 */
+  .result-head { display: flex; align-items: center; padding: 12px 24px 4px; }
+  .result-head .ttl { flex: 1; text-align: center; font-size: 17.5px; font-weight: 800; }
+  .result-body { flex: 1; overflow-y: auto; padding: 12px 24px; }
+  .rcard {
+    background: var(--card); border-radius: var(--r-lg);
+    box-shadow: var(--shadow-card);
+    padding: 16px; margin-bottom: 14px;
+    position: relative;
+  }
+  .rcard .rhead { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .rcard .chipname { background: var(--fill); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; font-weight: 700; }
+  .rcard .ok {
+    margin-left: auto;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--ink); color: #fff;
+    display: grid; place-content: center; font-size: 12px; font-weight: 900;
+  }
+  .rcard .rimg {
+    background: var(--fill); border-radius: var(--r-md);
+    height: 210px; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .rcard .rimg img { max-width: 74%; max-height: 84%; object-fit: contain; }
+  .rcard .tools { display: flex; gap: 8px; margin-top: 12px; }
+  .tool-pill {
+    border: none; background: var(--fill); border-radius: 999px;
+    padding: 9px 15px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+    color: var(--ink);
+  }
+  .result-foot { display: flex; gap: 12px; padding: 12px 24px calc(22px + env(safe-area-inset-bottom)); }
+
+  /* 变平铺 sheet */
+  .flat-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; scrollbar-width: none; }
+  .flat-row::-webkit-scrollbar { display: none; }
+  .flat-cell {
+    flex: none; width: 190px; aspect-ratio: .92;
+    background: var(--fill); border-radius: var(--r-md);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; padding: 16px;
+  }
+  .flat-cell img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .flat-cell .mk {
+    position: absolute; top: 10px; right: 10px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--ink); color: #fff;
+    display: grid; place-content: center; font-size: 11px; font-weight: 900;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 阶段1：添加入口（深色） -->
+  <div class="entry" id="stEntry">
+    <div class="down" onclick="history.length > 1 ? history.back() : location.href='home.html'">⌄</div>
+    <h1>添加衣服</h1>
+    <div class="ways">
+      <button class="way" id="wayAlbum"><span class="ic">🖼</span>相册导入</button>
+      <button class="way" id="wayCam"><span class="ic">📷</span>拍照导入</button>
+      <button class="way" id="wayWeb"><span class="ic">🌐</span>网页提取</button>
+    </div>
+    <div class="mailbox">
+      <div class="t">✉️ 衣服商品链接</div>
+      <div class="addr">
+        <span>3yez2xfhbgamtnm@mail.aiwear.com</span>
+        <button class="copy" onclick="toast('邮箱地址已复制')">⧉</button>
+      </div>
+    </div>
+    <input type="file" accept="image/*" id="fileInput" class="hidden">
+  </div>
+
+  <!-- 阶段2：扫描中 -->
+  <div class="stage-page" id="stScan">
+    <div class="scanning">
+      <div class="scan-frame">
+        <span class="corner tl"></span><span class="corner tr"></span>
+        <span class="corner bl"></span><span class="corner br"></span>
+        <div class="pic"><img id="scanPic" src="assets/ph/tee.svg"></div>
+      </div>
+      <h2>扫描中</h2>
+      <p>即将生成您的专属单品…</p>
+      <button class="btn btn-soft" style="padding:12px 34px" onclick="backToEntry()">取消</button>
+    </div>
+  </div>
+
+  <!-- 阶段3：单品识别 -->
+  <div class="stage-page" id="stResult">
+    <div class="result-head">
+      <button class="iconbtn" onclick="backToEntry()">‹</button>
+      <span class="ttl">单品识别</span>
+      <span style="font-size:13.5px;font-weight:700">全选 ✓</span>
+    </div>
+    <div class="result-body" id="resultBody"></div>
+    <div class="result-foot">
+      <button class="btn btn-ghost" style="flex:1.2" id="btnTryAdd">试衣并加入衣橱</button>
+      <button class="btn btn-primary" style="flex:1" id="btnAdd">加入衣橱 <span id="addCount">1</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- 变平铺 Sheet -->
+<div class="sheet-mask" id="mask-sheetFlat" onclick="closeSheet('sheetFlat')"></div>
+<div class="sheet" id="sheetFlat">
+  <div class="sheet-grab"></div>
+  <div class="sheet-title">变平铺
+    <button class="sheet-x" onclick="closeSheet('sheetFlat')">✕</button>
+  </div>
+  <div class="flat-row" id="flatRow"></div>
+  <div style="display:flex;gap:12px">
+    <button class="btn btn-ghost" style="flex:1" onclick="closeSheet('sheetFlat')">取消</button>
+    <button class="btn btn-primary" style="flex:1" onclick="closeSheet('sheetFlat');toast('已替换为平铺图')">确认</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  renderStatusbar();
+  document.querySelector(".statusbar").style.color = "#fff";
+
+  let uploaded = null;   // 用户上传的图（dataUrl）
+  const detected = [];   // 识别出的单品
+
+  function show(stage) {
+    $("#stEntry").style.display = stage === "entry" ? "flex" : "none";
+    $$(".stage-page").forEach(p => p.classList.remove("on"));
+    if (stage === "scan") $("#stScan").classList.add("on");
+    if (stage === "result") $("#stResult").classList.add("on");
+    document.querySelector(".statusbar").style.color = stage === "entry" ? "#fff" : "var(--ink)";
+  }
+  function backToEntry() { show("entry"); }
+
+  /* 三种导入方式 */
+  $("#wayAlbum").addEventListener("click", () => $("#fileInput").click());
+  $("#wayCam").addEventListener("click", () => $("#fileInput").click());
+  $("#wayWeb").addEventListener("click", () => {
+    toast("已解析商品链接");
+    startScan(null);
+  });
+  $("#fileInput").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => startScan(reader.result);
+    reader.readAsDataURL(f);
+  });
+
+  /* 扫描 → 识别 */
+  function startScan(dataUrl) {
+    uploaded = dataUrl;
+    $("#scanPic").src = dataUrl || "assets/ph/tee.svg";
+    show("scan");
+    setTimeout(() => {
+      detected.length = 0;
+      detected.push({
+        id: "c" + Date.now(),
+        name: "单品-1",
+        cat: "上衣",
+        ph: "tee",
+        dataUrl: uploaded,
+      });
+      renderResult();
+      show("result");
+    }, 2000);
+  }
+
+  function renderResult() {
+    $("#resultBody").innerHTML = detected.map(d => `
+      <div class="rcard rise">
+        <div class="rhead">
+          <span class="chipname">${d.name} ⟳</span>
+          <span class="ok">✓</span>
+        </div>
+        <div class="rimg">${d.dataUrl ? `<img src="${d.dataUrl}">` : itemImg(d)}</div>
+        <div class="tools">
+          <button class="tool-pill" onclick="openFlat()">✂️ 品类抠图</button>
+          <button class="tool-pill" onclick="openFlat()">🧺 变平铺</button>
+          <button class="tool-pill" onclick="toast('手动抠图即将上线')">✏️ 手动抠图</button>
+        </div>
+      </div>`).join("");
+    $("#addCount").textContent = detected.length;
+  }
+
+  /* 变平铺 sheet */
+  function openFlat() {
+    const d = detected[0];
+    $("#flatRow").innerHTML = `
+      <div class="flat-cell"><span class="mk">✓</span>${d.dataUrl ? `<img src="${d.dataUrl}">` : itemImg(d)}</div>
+      <div class="flat-cell"><img src="assets/ph/tee.svg" style="opacity:.75"></div>`;
+    openSheet("sheetFlat");
+  }
+
+  /* 加入衣橱 */
+  function addToWardrobe() {
+    const s = Store.get();
+    Store.set({ customItems: [...s.customItems, ...detected] });
+    toast(`已加入衣橱 ${detected.length} 件`);
+  }
+  $("#btnAdd").addEventListener("click", () => {
+    addToWardrobe();
+    setTimeout(() => location.href = "wardrobe.html", 700);
+  });
+  $("#btnTryAdd").addEventListener("click", () => {
+    addToWardrobe();
+    const id = detected[0].id;
+    setTimeout(() => location.href = `tryon.html?item=${id}`, 700);
+  });
+
+  show("entry");
+</script>
+</body>
+</html>

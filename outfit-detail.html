@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>穿搭详情 · AI穿搭助手</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .hero {
+    position: relative;
+    margin: 6px 24px 0;
+    background: var(--card);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-card);
+    padding: 26px;
+    min-height: 300px;
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; align-items: center;
+  }
+  .hero img { width: 100%; object-fit: contain; }
+  .hero .main img { aspect-ratio: .8; }
+  .hero .side { display: flex; flex-direction: column; gap: 8px; }
+  .hero .side img { aspect-ratio: 1.1; }
+  .hero .fav {
+    position: absolute; top: 14px; right: 14px;
+    width: 38px; height: 38px; border-radius: 50%;
+    border: none; background: var(--fill); cursor: pointer;
+    font-size: 17px; color: #c9c9c6;
+  }
+  .hero .fav.on { color: var(--ink); }
+
+  .info { padding: 20px 24px 6px; }
+  .info h1 { font-size: 26px; font-weight: 900; }
+  .info .meta { display: flex; gap: 8px; margin-top: 10px; }
+  .meta .tag {
+    font-size: 12.5px; font-weight: 700;
+    background: var(--fill); border-radius: 999px; padding: 6px 13px;
+  }
+  .info p { color: var(--ink-2); font-size: 14.5px; line-height: 1.8; margin-top: 14px; }
+
+  .pieces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px 24px 20px; }
+  .piece {
+    background: var(--card); border-radius: var(--r-md);
+    box-shadow: var(--shadow-card);
+    padding: 12px; text-align: center; cursor: pointer;
+  }
+  .piece img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+  .piece .nm { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+
+  .detail-foot {
+    position: sticky; bottom: 0;
+    padding: 14px 24px calc(20px + env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, var(--bg) 40%);
+    display: flex; gap: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="pagehead">
+    <button class="iconbtn" onclick="history.length > 1 ? history.back() : location.href='home.html'">‹</button>
+    <span class="grow"></span>
+    <button class="iconbtn" onclick="toast('分享功能即将上线')">↗</button>
+  </div>
+
+  <div class="scroll-body">
+    <div class="hero rise" id="hero"></div>
+    <div class="info rise d1">
+      <h1 id="oName"></h1>
+      <div class="meta" id="oMeta"></div>
+      <p id="oDesc"></p>
+    </div>
+    <div class="sec-head px rise d2" style="display:flex;padding-bottom:10px">
+      <span class="section-title">穿搭单品</span>
+      <span class="grow"></span>
+      <span class="section-note" id="pieceCount"></span>
+    </div>
+    <div class="pieces rise d2" id="pieces"></div>
+  </div>
+
+  <div class="detail-foot">
+    <button class="btn btn-ghost" style="flex:1" id="btnFav2">★ 收藏</button>
+    <button class="btn btn-primary" style="flex:2" id="btnTry">试穿</button>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  renderStatusbar();
+
+  const id = new URLSearchParams(location.search).get("id") || "o1";
+  const o = OUTFITS.find(x => x.id === id) || OUTFITS[0];
+  const its = o.items.map(itemById).filter(Boolean);
+
+  $("#hero").innerHTML = `
+    <button class="fav" id="btnFav">★</button>
+    <div class="main">${itemImg(its[0])}</div>
+    <div class="side">${its.slice(1, 4).map(i => itemImg(i)).join("")}</div>`;
+  $("#oName").textContent = o.name;
+  $("#oMeta").innerHTML = `<span class="tag">${o.scene}</span><span class="tag">${its.length} 件单品</span><span class="tag">✦ AI 推荐</span>`;
+  $("#oDesc").textContent = o.desc;
+  $("#pieceCount").textContent = `${its.length} 件`;
+  $("#pieces").innerHTML = its.map(i => `
+    <div class="piece" onclick="location.href='tryon.html?item=${i.id}'">
+      ${itemImg(i)}<div class="nm">${i.name}</div>
+    </div>`).join("");
+
+  function syncFav() {
+    const on = Store.get().favorites.includes(o.id);
+    $("#btnFav").classList.toggle("on", on);
+    $("#btnFav2").textContent = on ? "★ 已收藏" : "★ 收藏";
+  }
+  function toggleFav() {
+    const favs = Store.get().favorites;
+    const on = favs.includes(o.id);
+    Store.set({ favorites: on ? favs.filter(f => f !== o.id) : [...favs, o.id] });
+    syncFav();
+    toast(on ? "已取消收藏" : "已加入收藏");
+  }
+  $("#btnFav").addEventListener("click", toggleFav);
+  $("#btnFav2").addEventListener("click", toggleFav);
+  $("#btnTry").addEventListener("click", () => location.href = `tryon.html?outfit=${o.id}`);
+  syncFav();
+</script>
+</body>
+</html>
