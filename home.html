@@ -66,6 +66,10 @@
   function renderOutfits() {
     const list = availableOutfits().filter(o => scene === "全部" || o.scene === scene);
     const favs = Store.get().favorites;
+    if (!list.length) {
+      $("#outfitGrid").innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:70px 40px;font-size:15px;line-height:2">这个场景还没有搭配<br>去试穿页用 AI 搭一套吧</div>`;
+      return;
+    }
     $("#outfitGrid").innerHTML = list.map(o => {
       const its = o.items.map(itemById).filter(Boolean);
       return `

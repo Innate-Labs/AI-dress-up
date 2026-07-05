@@ -24,6 +24,8 @@ const SCENES = [
   { key: "通勤", icon: "💼" },
   { key: "约会", icon: "🌹" },
   { key: "旅行", icon: "🧳" },
+  { key: "日常", icon: "☀️" },
+  { key: "其他", icon: "🏷️" },
 ];
 
 const OUTFITS = [
@@ -34,7 +36,7 @@ const OUTFITS = [
   { id: "o5", name: "甜酷反差",  scene: "约会", items: ["t02", "s01", "f01"], desc: "黑T恤与百褶裙的反差混搭，甜而不腻。" },
   { id: "o6", name: "舒适出行",  scene: "旅行", items: ["t01", "b03", "f02"], desc: "轻装上阵，怎么走都不累的万能组合。" },
   { id: "o7", name: "风衣叠穿",  scene: "旅行", items: ["t06", "b02", "f01"], desc: "风衣+牛仔裤的经典组合，应对旅途早晚温差。" },
-  { id: "o8", name: "连帽休闲",  scene: "约会", items: ["t05", "b02", "f02"], desc: "连帽外套的随性感，适合轻松的约会场景。" },
+  { id: "o8", name: "连帽休闲",  scene: "日常", items: ["t05", "b02", "f02"], desc: "连帽外套的随性感，适合日常放松的场景。" },
 ];
 
 const JOBS = {
