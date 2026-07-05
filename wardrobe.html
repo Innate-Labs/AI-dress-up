@@ -141,6 +141,27 @@
   });
 
   renderCats(); renderItems();
+
+  /* 从添加衣服页带回的上传：AI 在后台识别，完成后自动入橱 */
+  const pending = Store.get().pendingUpload;
+  if (pending) {
+    toast("上传成功，AI 正在后台抠图整理…");
+    setTimeout(() => {
+      const item = {
+        id: "c" + Date.now(),
+        name: "我的单品",
+        cat: "上衣",
+        ph: "tee",
+        dataUrl: pending === "ph" ? null : pending,
+      };
+      Store.set({
+        customItems: [...Store.get().customItems, item],
+        pendingUpload: null,
+      });
+      renderCats(); renderItems();
+      toast("已添加到衣橱");
+    }, 1800);
+  }
 </script>
 </body>
 </html>

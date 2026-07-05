@@ -67,21 +67,10 @@
 <script>
   renderStatusbar();
 
-  /* 选图后：后台自动抠图 → 直接入橱 → 跳衣橱查看结果 */
+  /* 选图后：立刻回衣橱页，AI 识别在后台完成（由衣橱页接力演示） */
   function bgAdd(dataUrl) {
-    toast("上传成功，AI 正在抠图整理…");
-    setTimeout(() => {
-      const item = {
-        id: "c" + Date.now(),
-        name: "我的单品",
-        cat: "上衣",
-        ph: "tee",
-        dataUrl,
-      };
-      Store.set({ customItems: [...Store.get().customItems, item] });
-      toast("已添加到衣橱");
-      setTimeout(() => location.href = "wardrobe.html", 600);
-    }, 1500);
+    Store.set({ pendingUpload: dataUrl || "ph" });
+    location.href = "wardrobe.html";
   }
 
   $("#wayAlbum").addEventListener("click", () => $("#fileInput").click());
