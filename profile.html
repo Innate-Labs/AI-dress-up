@@ -143,7 +143,7 @@
   /* 我的收藏：与首页卡片一致，收藏为已选中态 */
   function renderFavs() {
     const favs = Store.get().favorites;
-    const list = OUTFITS.filter(o => favs.includes(o.id));
+    const list = availableOutfits().filter(o => favs.includes(o.id));
     $("#favGrid").innerHTML = list.length ? list.map(o => {
       const its = o.items.map(itemById).filter(Boolean);
       return `

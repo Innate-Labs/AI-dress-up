@@ -43,6 +43,14 @@ function wardrobeItems() {
   const s = Store.get();
   return [...ITEMS.filter(i => s.wardrobe.includes(i.id)), ...s.customItems];
 }
+function inWardrobe(id) {
+  const s = Store.get();
+  return s.wardrobe.includes(id) || s.customItems.some(c => c.id === id);
+}
+/* 搭配里只要有一件衣服被删，该搭配整套不再展示 */
+function availableOutfits() {
+  return OUTFITS.filter(o => o.items.every(inWardrobe));
+}
 
 /* 单品 <img>：优先找 assets/real/<id>.png → .jpg → 占位剪影 */
 function itemImg(item, cls = "ph-img") {

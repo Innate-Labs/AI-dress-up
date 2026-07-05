@@ -35,14 +35,17 @@
 
 ```
 index.html          总览页（桌面演示用，手机壳网格展示全部页面）
-login.html        → signup.html（邮箱注册）
+login.html          一键登录；其他手机号登录=弹层输手机号+短信验证码 → signup.html（邮箱注册）
                   → onboarding.html（4步引导：性别/职业/偏好/选单品）→ home.html
 home.html           首页「灵感试穿」：场景chips + 搭配卡（纯图片，左下收藏/右下试穿）→ tryon / outfit-detail
-tryon.html          模特试穿：?outfit=oX / ?item=tXX / ?items=a,b,c；抽屉两tab（穿搭/我的衣服），+号打开系统相册直接选图入橱，AI搭配
+tryon.html          模特试穿：?outfit=oX / ?item=tXX / ?items=a,b,c；抽屉两tab（我的衣服在前默认选中/穿搭在后），
+                    +号打开系统相册直接选图入橱；「AI 一键搭配」优先用用户上传的衣服、缺的分类用系统款补，
+                    用户没上传过衣服时按钮置灰、点击 toast 提示先上传；?item= 进入时自动围绕该单品 AI 搭配
 outfit-detail.html  穿搭详情：?id=oX；只展示图片，点任意单品弹「替换XX」弹窗（同分类可选）
-add-clothes.html    添加衣服：入口(深色) → 扫描 → 单品识别 → 入橱
+add-clothes.html    添加衣服：深色入口页；相册/拍照选图后**后台自动抠图直接入橱**（toast 提示，无确认页），跳衣橱
 create-model.html   创建模特：预设/我的照片、上传提示sheet、失败弹窗（"现在拍一张"=演示失败路径，"打开相册"=成功路径）
-wardrobe.html       衣橱：圆形分类筛选，整卡可点跳 tryon
+wardrobe.html       衣橱：圆形分类筛选；卡片右上角🗑删除（弹确认框，删除后相关搭配全站同步隐藏，
+                    逻辑=js/app.js 的 availableOutfits()）；点整卡/去搭配 → tryon?item= 自动 AI 搭配
 history.html        试衣间：3列等高图片墙（无标签），点卡片进 iOS 图库式查看器（大图+底部缩略图切换），编辑删除
 profile.html        我的：收藏（与首页同款卡片，星标为已选中态）/模特两tab
 ```

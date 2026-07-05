@@ -33,11 +33,19 @@
   /* 单品网格 */
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 14px var(--pad) 26px; }
   .icard {
-    min-width: 0;
+    min-width: 0; position: relative;
     background: var(--card); border-radius: var(--r-lg);
     box-shadow: var(--shadow-card); padding: 16px 14px 14px;
     text-align: center; cursor: pointer;
   }
+  .icard .del {
+    position: absolute; top: 6px; right: 6px; z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none; background: var(--fill);
+    color: var(--ink-2); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icard .del:active { background: var(--fill-2); }
   .icard .imgwrap { height: 128px; display: flex; align-items: center; justify-content: center; }
   .icard img { max-width: 100%; max-height: 100%; object-fit: contain; }
   .match-pill {
@@ -60,6 +68,18 @@
 
   <div class="catbar rise d1" id="catbar"></div>
   <div class="grid2 rise d2" id="itemGrid"></div>
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-mask" id="modalDel">
+  <div class="modal">
+    <h3>删除衣服</h3>
+    <p>删除后，和该衣服相关的搭配也将同步删除。</p>
+    <div style="display:flex;gap:12px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeModal('modalDel')">取消</button>
+      <button class="btn btn-primary" style="flex:1" id="btnDelOk">确定</button>
+    </div>
+  </div>
 </div>
 
 <script src="js/data.js"></script>
@@ -92,13 +112,33 @@
     const list = wardrobeItems().filter(i => cat === "全部" || i.cat === cat);
     $("#itemGrid").innerHTML = list.length ? list.map(it => `
       <div class="icard" data-go="${it.id}">
+        <button class="del" data-del="${it.id}">🗑</button>
         <div class="imgwrap">${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}</div>
         <button class="match-pill">去搭配</button>
       </div>`).join("")
       : `<div class="empty" style="grid-column:1/-1">这个分类还没有衣服<br>点底部 + 号上传第一件吧</div>`;
+    /* 点整卡或「去搭配」→ 带着这件衣服去 AI 搭配试穿 */
     $$("[data-go]").forEach(c => c.addEventListener("click", () =>
       location.href = `tryon.html?item=${c.dataset.go}`));
+    $$("[data-del]").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      delTarget = b.dataset.del;
+      openModal("modalDel");
+    }));
   }
+
+  /* 删除衣服（相关搭配在各页通过 availableOutfits 同步隐藏） */
+  let delTarget = null;
+  $("#btnDelOk").addEventListener("click", () => {
+    const s = Store.get();
+    Store.set({
+      wardrobe: s.wardrobe.filter(id => id !== delTarget),
+      customItems: s.customItems.filter(c => c.id !== delTarget),
+    });
+    closeModal("modalDel");
+    toast("已删除，相关搭配已同步移除");
+    renderCats(); renderItems();
+  });
 
   renderCats(); renderItems();
 </script>

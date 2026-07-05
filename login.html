@@ -41,7 +41,7 @@
 
     <button class="btn btn-primary btn-block rise d3" id="btnQuick">一键登录</button>
     <div style="height:14px"></div>
-    <button class="btn btn-ghost btn-block rise d3" onclick="loginGo('其他手机号')">其他手机号登录</button>
+    <button class="btn btn-ghost btn-block rise d3" onclick="if(agreeOk())openSheet('sheetPhone')">其他手机号登录</button>
 
     <button class="more-login rise d4" onclick="openSheet('sheetMore')">更多登录方式 ›</button>
   </div>
@@ -52,6 +52,23 @@
       <span>我已阅读并同意 <a href="javascript:;">用户协议</a>、<a href="javascript:;">个人信息保护政策</a>、<a href="javascript:;">账号规则</a> 和 <a href="javascript:;">天翼数字生活账号服务条款</a></span>
     </label>
   </div>
+</div>
+
+<!-- 其他手机号登录 Sheet -->
+<div class="sheet-mask" id="mask-sheetPhone" onclick="closeSheet('sheetPhone')"></div>
+<div class="sheet" id="sheetPhone">
+  <div class="sheet-grab"></div>
+  <div class="sheet-title">手机号登录
+    <button class="sheet-x" onclick="closeSheet('sheetPhone')">✕</button>
+  </div>
+  <div class="field" style="margin-bottom:14px">
+    <input type="tel" id="phone" maxlength="11" placeholder="请输入手机号">
+  </div>
+  <div class="field" style="margin-bottom:20px">
+    <input type="tel" id="smsCode" maxlength="6" placeholder="请输入短信验证码">
+    <button class="field-act" id="sendSms">发送验证码</button>
+  </div>
+  <button class="btn btn-primary btn-block" id="btnPhoneLogin" disabled>登录</button>
 </div>
 
 <!-- 更多登录方式 Sheet -->
@@ -81,6 +98,34 @@
       location.href = Store.get().onboarded ? "home.html" : "onboarding.html";
     }, 700);
   }
+  /* 手机号 + 短信验证码登录 */
+  function phoneCheck() {
+    $("#btnPhoneLogin").disabled = !($("#phone").value.length === 11 && $("#smsCode").value.length >= 4);
+  }
+  $("#phone").addEventListener("input", phoneCheck);
+  $("#smsCode").addEventListener("input", phoneCheck);
+
+  let smsCd = 0, smsTimer;
+  $("#sendSms").addEventListener("click", () => {
+    if (smsCd > 0) return;
+    if ($("#phone").value.length !== 11) { toast("请先输入 11 位手机号"); return; }
+    toast("验证码已发送");
+    smsCd = 60;
+    $("#sendSms").disabled = true;
+    smsTimer = setInterval(() => {
+      smsCd--;
+      $("#sendSms").textContent = smsCd > 0 ? `${smsCd}s 后重发` : "发送验证码";
+      if (smsCd <= 0) { clearInterval(smsTimer); $("#sendSms").disabled = false; }
+    }, 1000);
+  });
+  $("#btnPhoneLogin").addEventListener("click", () => {
+    $("#btnPhoneLogin").textContent = "登录中…";
+    setTimeout(() => {
+      closeSheet("sheetPhone");
+      loginGoDirect();
+    }, 800);
+  });
+
   $("#btnQuick").addEventListener("click", () => {
     if (!agreeOk()) return;
     const btn = $("#btnQuick");

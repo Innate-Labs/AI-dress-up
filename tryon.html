@@ -46,6 +46,12 @@
     display: flex; align-items: center; gap: 6px;
     box-shadow: var(--shadow-float);
   }
+  .ai-match.off {
+    background-image: linear-gradient(var(--card), var(--card)),
+      linear-gradient(96deg, #dcdcd9, #dcdcd9);
+    color: var(--muted);
+    box-shadow: none;
+  }
 
   /* 底部抽屉 */
   .drawer {
@@ -120,23 +126,23 @@
       <button class="iconbtn" id="btnFav" title="收藏">★</button>
     </div>
 
-    <button class="btn ai-pill ai-match" id="btnAI">✦ AI 根据衣橱搭配</button>
+    <button class="btn ai-pill ai-match" id="btnAI">✦ AI 一键搭配</button>
   </div>
 
   <div class="drawer">
     <div class="grab"></div>
     <div class="dtabs">
-      <button class="on" data-t="outfit">穿搭</button>
-      <button data-t="mine">我的衣服</button>
+      <button class="on" data-t="mine">我的衣服</button>
+      <button data-t="outfit">穿搭</button>
     </div>
 
-    <div id="paneOutfit" style="display:flex;flex-direction:column;flex:1;min-height:0">
-      <div class="dgrid pt" id="outfitGrid"></div>
-    </div>
-
-    <div id="paneMine" class="hidden" style="flex-direction:column;flex:1;min-height:0">
+    <div id="paneMine" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <div class="dchips" id="catChips"></div>
       <div class="dgrid" id="mineGrid"></div>
+    </div>
+
+    <div id="paneOutfit" class="hidden" style="flex-direction:column;flex:1;min-height:0">
+      <div class="dgrid pt" id="outfitGrid"></div>
     </div>
   </div>
 </div>
@@ -151,6 +157,7 @@
   const qs = new URLSearchParams(location.search);
   let wearing = [];           // 当前上身的单品 id
   let curOutfitId = null;
+  let aiAround = null;
 
   /* 初始状态：?outfit= / ?items= / ?item= */
   if (qs.get("outfit")) {
@@ -160,6 +167,7 @@
     wearing = qs.get("items").split(",").filter(id => itemById(id));
   } else if (qs.get("item")) {
     wearing = [qs.get("item")];
+    aiAround = qs.get("item");   // 进页后围绕这件单品做 AI 搭配
   } else {
     wearing = [...OUTFITS[0].items]; curOutfitId = OUTFITS[0].id;
   }
@@ -174,11 +182,11 @@
   }
   $("#modelSwitch").addEventListener("click", () => location.href = "create-model.html");
 
-  /* ---- 穿搭 tab ---- */
+  /* ---- 穿搭 tab（被删衣服的搭配不再展示） ---- */
   function renderOutfitGrid() {
     $("#outfitGrid").innerHTML =
       `<div class="dcell add" data-add>＋</div>` +
-      OUTFITS.map(o => `
+      availableOutfits().map(o => `
         <div class="dcell ${o.id === curOutfitId ? "on" : ""}" data-o="${o.id}">
           <div class="combo">${o.items.slice(0, 4).map(id => itemImg(itemById(id))).join("")}</div>
         </div>`).join("");
@@ -247,25 +255,57 @@
     toast(`已换上「${it.name}」`);
   }
 
-  /* AI 搭配 */
+  /* ---- AI 搭配：优先用用户上传的衣服，缺的分类用系统默认款补 ---- */
+  function aiPickCat(cat, excludeId) {
+    const pool = wardrobeItems().filter(i => i.cat === cat && i.id !== excludeId);
+    const mine = pool.filter(i => i.dataUrl);         // 用户上传的优先
+    const list = mine.length ? mine : pool;
+    return list.length ? list[Math.floor(Math.random() * list.length)].id : null;
+  }
+  function aiOutfitAround(id) {
+    const it = itemById(id);
+    if (!it) return [id];
+    const need = {
+      "上衣": ["下装", "鞋子"],
+      "下装": ["上衣", "鞋子"],
+      "连体裙": ["鞋子"],
+      "鞋子": Math.random() > .3 ? ["上衣", "下装"] : ["连体裙"],
+    }[it.cat] || [];
+    return [id, ...need.map(c => aiPickCat(c, id))].filter(Boolean);
+  }
+  function hasUploads() { return Store.get().customItems.length > 0; }
+  function syncAIBtn() { $("#btnAI").classList.toggle("off", !hasUploads()); }
+
   $("#btnAI").addEventListener("click", () => {
+    if (!hasUploads()) {
+      toast("衣橱里还没有你的衣服，先上传一件再试试吧");
+      return;
+    }
     const btn = $("#btnAI");
     btn.textContent = "✦ AI 搭配中…";
     setTimeout(() => {
-      const pool = wardrobeItems();
-      const pick = cat => {
-        const list = pool.filter(i => i.cat === cat);
-        return list.length ? list[Math.floor(Math.random() * list.length)].id : null;
-      };
       wearing = (Math.random() > .3
-        ? [pick("上衣"), pick("下装"), pick("鞋子")]
-        : [pick("连体裙"), pick("鞋子")]).filter(Boolean);
+        ? [aiPickCat("上衣"), aiPickCat("下装"), aiPickCat("鞋子")]
+        : [aiPickCat("连体裙"), aiPickCat("鞋子")]).filter(Boolean);
       curOutfitId = null;
       renderAll();
-      btn.innerHTML = "✦ AI 根据衣橱搭配";
+      btn.innerHTML = "✦ AI 一键搭配";
       toast("AI 已为你搭配一套新造型");
     }, 900);
   });
+
+  /* 从衣橱带单品进来：围绕它自动完成 AI 搭配 */
+  if (aiAround) {
+    const btn = $("#btnAI");
+    btn.textContent = "✦ AI 搭配中…";
+    setTimeout(() => {
+      wearing = aiOutfitAround(aiAround);
+      curOutfitId = null;
+      renderAll();
+      btn.innerHTML = "✦ AI 一键搭配";
+      toast("AI 已围绕这件衣服完成搭配");
+    }, 1000);
+  }
 
   /* 收藏 */
   function syncFav() {
@@ -284,13 +324,15 @@
   $$(".dtabs button").forEach(b => b.addEventListener("click", () => {
     $$(".dtabs button").forEach(x => x.classList.remove("on"));
     b.classList.add("on");
-    $("#paneOutfit").style.display = b.dataset.t === "outfit" ? "flex" : "none";
-    $("#paneMine").classList.toggle("hidden", b.dataset.t !== "mine");
-    $("#paneMine").style.display = b.dataset.t === "mine" ? "flex" : "none";
+    const t = b.dataset.t;
+    $("#paneMine").classList.toggle("hidden", t !== "mine");
+    $("#paneMine").style.display = t === "mine" ? "flex" : "none";
+    $("#paneOutfit").classList.toggle("hidden", t !== "outfit");
+    $("#paneOutfit").style.display = t === "outfit" ? "flex" : "none";
   }));
 
   function renderAll() {
-    renderOutfitGrid(); renderMineGrid(); renderModelBadge(); syncFav();
+    renderOutfitGrid(); renderMineGrid(); renderModelBadge(); syncFav(); syncAIBtn();
   }
   renderCatChips(); renderAll();
 </script>

@@ -64,7 +64,7 @@
 
   let scene = "全部";
   function renderOutfits() {
-    const list = OUTFITS.filter(o => scene === "全部" || o.scene === scene);
+    const list = availableOutfits().filter(o => scene === "全部" || o.scene === scene);
     const favs = Store.get().favorites;
     $("#outfitGrid").innerHTML = list.map(o => {
       const its = o.items.map(itemById).filter(Boolean);
