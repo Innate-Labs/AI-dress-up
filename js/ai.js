@@ -77,7 +77,10 @@ const AI = {
   /* ---------- ③ 搭配推荐 ---------- */
   async recommend(wardrobe, around = null) {
     const payload = {
-      wardrobe: wardrobe.map(i => ({ id: i.id, category: i.cat, custom: !!i.dataUrl })),
+      wardrobe: wardrobe.map(i => ({
+        id: i.id, category: i.cat, custom: !!i.dataUrl,
+        name: i.name || "", labels: i.labels || null,
+      })),
       around,
     };
     if (await this.available()) {

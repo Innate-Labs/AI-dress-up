@@ -6,7 +6,7 @@
 
 这是一个**能跑起来的移动端网页产品**：功能真实可用，AI 能力已接真实模型
 （质检 qwen3.6-flash / 识别标签 qwen3-vl / 平铺图 gemini-3.1-flash-image 经 OpenRouter；
-试穿 aitryon-plus 经阿里云百炼）。搭配推荐暂为规则实现。
+试穿 aitryon-plus 经阿里云百炼；搭配推荐 qwen3.6-flash 读标签选搭配、规则兜底）。
 密钥在 server/.env（不进 git）；换模型只改 server/ai/config.js 的 MODELS；提示词在 server/ai/prompts.js。
 
 - ✅ 做：页面 UI、真实交互、轻量后端 AI 接口层（占位实现，接口契约固定）

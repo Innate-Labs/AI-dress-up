@@ -26,5 +26,6 @@ module.exports = {
     /* 平铺图生成：gemini 约15秒/张；追求更高质量可换 "openai/gpt-5.4-image-2"（约2.5分钟/张，实测更精致） */
     flatImage: "google/gemini-3.1-flash-image",  // 模型2第2步 平铺图生成
     tryon: "aitryon-plus",                       // 模型4 试穿（DashScope）
+    recommend: "qwen/qwen3.6-flash",             // 模型5 搭配推荐（读标签做选择，快且便宜）
   },
 };

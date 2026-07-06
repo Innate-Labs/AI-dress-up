@@ -413,7 +413,9 @@
       curOutfitId = null; genImage = null;
       renderAll();
       await applyTryon();
-      toast(around ? "AI 已围绕这件衣服完成搭配" : "AI 已为你搭配一套新造型");
+      toast(r.reason
+        ? `AI：${r.reason}`
+        : (around ? "AI 已围绕这件衣服完成搭配" : "AI 已为你搭配一套新造型"));
     } else {
       toast("衣橱里的衣服不够搭一套，先多上传几件吧");
     }

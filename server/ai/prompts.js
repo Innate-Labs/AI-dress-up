@@ -134,4 +134,21 @@ function mapScene(s) {
   return ["通勤", "约会", "旅行", "日常"].includes(s) ? s : "其他";
 }
 
-module.exports = { QC_PROMPT, DETECT_PROMPT, flatImagePrompt, TAG_PROMPT, CAT_MAP, mapScene };
+/* 模型5 · 搭配推荐（读衣橱标签，选出一套协调的搭配） */
+function recommendPrompt(wardrobe, aroundId) {
+  return `你是穿搭搭配助手。根据下面的衣橱清单，选出一套颜色和风格协调的搭配。
+
+衣橱清单（custom=true 表示用户自己上传的衣服）：
+${JSON.stringify(wardrobe, null, 0)}
+
+要求：
+1. 一套搭配 = 上衣+下装+鞋子，或 连体裙+鞋子。
+${aroundId ? `2. 必须包含 id 为 "${aroundId}" 的单品，围绕它来搭配其他单品。` : "2. 自由组合出最协调的一套。"}
+3. 每个分类优先选 custom=true 的衣服；该分类没有用户衣服时才选系统款。
+4. 颜色搭配要和谐，风格尽量统一，参考各单品的标签。
+5. 只能使用清单里出现过的 id，禁止编造。
+6. 只输出纯 JSON，不要解释，不要代码块，格式：
+{ "items": ["id1", "id2", "id3"], "reason": "20字以内的搭配理由" }`;
+}
+
+module.exports = { QC_PROMPT, DETECT_PROMPT, flatImagePrompt, TAG_PROMPT, CAT_MAP, mapScene, recommendPrompt };
