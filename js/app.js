@@ -23,11 +23,14 @@ const Store = {
     if (!this._cache) {
       try { this._cache = { ...this.defaults(), ...JSON.parse(localStorage.getItem(this.KEY) || "{}") }; }
       catch { this._cache = this.defaults(); }
-      /* 迁移：老数据补齐 4 个预设模特 */
-      const have = new Set(this._cache.models.map(m => m.id));
-      PRESET_MODELS.forEach(p => {
-        if (!have.has(p.id)) this._cache.models.push({ ...p, dataUrl: null });
-      });
+      /* 迁移：虚拟模特只保留默认款（高个/微胖/小个子已下线），用户上传的照片模特保留 */
+      this._cache.models = this._cache.models.filter(m => m.dataUrl || m.id === "m1");
+      if (!this._cache.models.find(m => m.id === "m1")) {
+        this._cache.models.unshift({ ...PRESET_MODELS[0], dataUrl: null });
+      }
+      if (!this._cache.models.find(m => m.id === this._cache.curModel)) {
+        this._cache.curModel = "m1";
+      }
     }
     return this._cache;
   },
@@ -69,14 +72,8 @@ function phFallback(el, ph) {
   el.src = el.src.replace(/\.png$/, ".jpg");
 }
 
-/* ---------- 假 iOS 状态栏 ---------- */
-function renderStatusbar() {
-  const el = document.createElement("div");
-  el.className = "statusbar";
-  el.innerHTML = `<span>9:41</span>
-    <span class="sb-right">5G <i class="sb-batt"></i></span>`;
-  document.querySelector(".app").prepend(el);
-}
+/* 假 iOS 状态栏已移除（手机自带真状态栏）；保留空函数兼容各页面的调用 */
+function renderStatusbar() {}
 
 /* ---------- 底部导航 ---------- */
 const TABS = [

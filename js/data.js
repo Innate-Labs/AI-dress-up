@@ -39,12 +39,9 @@ const OUTFITS = [
   { id: "o8", name: "连帽休闲",  scene: "日常", items: ["t05", "b02", "f02"], desc: "连帽外套的随性感，适合日常放松的场景。" },
 ];
 
-/* 预设模特：shape 用于剪影体型区分（tall 高个 / wide 微胖 / petite 小个子） */
+/* 预设虚拟模特：产品定义只有一个默认款，不可切换其他虚拟模特 */
 const PRESET_MODELS = [
-  { id: "m1", name: "默认模特",   shape: "" },
-  { id: "p2", name: "高个模特",   shape: "tall" },
-  { id: "p3", name: "微胖模特",   shape: "wide" },
-  { id: "p4", name: "小个子模特", shape: "petite" },
+  { id: "m1", name: "默认模特", shape: "" },
 ];
 
 const JOBS = {

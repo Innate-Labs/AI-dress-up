@@ -5,7 +5,8 @@
       "name": "prototype",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server/server.js"],
-      "port": 8394
+      "port": 8394,
+      "autoPort": true
     }
   ]
 }

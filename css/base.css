@@ -50,6 +50,8 @@ body {
   display: flex;
   flex-direction: column;
   overflow: clip;
+  /* 手机自带状态栏：内容避开刘海安全区，再留一点呼吸空间 */
+  padding-top: calc(env(safe-area-inset-top) + 8px);
 }
 @media (min-width: 431px) {
   .app { box-shadow: 0 0 60px rgba(0,0,0,.18); }
@@ -67,27 +69,6 @@ body {
   pointer-events: none;
 }
 .app > * { position: relative; }
-
-/* ---------- 假 iOS 状态栏 ---------- */
-.statusbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px var(--pad) 6px;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: .02em;
-}
-.statusbar .sb-right { display: flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 600; }
-.sb-batt {
-  width: 24px; height: 12px;
-  border: 1.5px solid var(--ink); border-radius: 4px;
-  position: relative;
-}
-.sb-batt::after {
-  content: ""; position: absolute; inset: 2px 30% 2px 2px;
-  background: var(--ink); border-radius: 1.5px;
-}
 
 /* ---------- 页头 ---------- */
 .pagehead { padding: 10px var(--pad) 4px; display: flex; align-items: center; gap: 12px; }

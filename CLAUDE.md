@@ -39,7 +39,8 @@
 - 按钮一律胶囊形：主按钮黑底白字 `.btn-primary`，次按钮白底描边 `.btn-ghost`
 - 标题超粗（font-weight 900），正文用系统苹方
 - **唯一的彩色**是粉→薄荷渐变 `--grad`，只准用在 AI 能力相关的元素上（`.ai-pill`）
-- 每页顶部有假 iOS 状态栏 `renderStatusbar()`；主 tab 页底部有 `renderTabbar('key')`
+- 假 iOS 状态栏已移除（手机自带真状态栏，`renderStatusbar()` 是空函数勿删勿复用）；主 tab 页底部有 `renderTabbar('key')`
+- 虚拟模特只有 1 个默认款（`PRESET_MODELS`），不许加回多个预设；用户上传照片的模特不限数量
 - 参考对标产品截图：`design-reference/wearwow/`，风格笔记：`design-reference/wearwow-style-notes.md`
 
 ## 页面清单与流程
