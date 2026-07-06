@@ -204,19 +204,15 @@ body {
 .tabbar a.active { color: var(--ink); }
 .tabbar .fab-slot { position: relative; }
 .fab {
-  position: absolute; left: 50%; top: -22px; transform: translateX(-50%);
-  width: 56px; height: 56px; border-radius: 50%;
+  /* 黑圆缩小并整体下移，完全收进导航栏内；+ 号放大 */
+  position: absolute; left: 50%; top: 6px; transform: translateX(-50%);
+  width: 48px; height: 48px; border-radius: 50%;
   background: var(--ink); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-size: 26px; font-weight: 300;
   box-shadow: var(--shadow-float);
   text-decoration: none;
 }
 .fab:active { transform: translateX(-50%) scale(.94); }
-.fab-slot .fab-label {
-  position: absolute; left: 0; right: 0; bottom: 18px;
-  text-align: center; font-size: 10px; font-weight: 500; color: var(--muted);
-}
 
 /* ---------- 半屏抽屉 Sheet ---------- */
 .sheet-mask {

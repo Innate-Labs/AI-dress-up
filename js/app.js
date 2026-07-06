@@ -100,7 +100,7 @@ function renderTabbar(active) {
   const nav = document.createElement("nav");
   nav.className = "tabbar";
   nav.innerHTML = TABS.map(t => t.fab
-    ? `<div class="fab-slot"><a class="fab" href="${t.href}">+</a><span class="fab-label">${t.label}</span></div>`
+    ? `<div class="fab-slot"><a class="fab" href="${t.href}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 4.5v15M4.5 12h15"/></svg></a></div>`
     : `<a href="${t.href}" class="${t.key === active ? "active" : ""}">${t.icon}<span>${t.label}</span></a>`
   ).join("");
   document.querySelector(".app").append(nav);
