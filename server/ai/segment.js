@@ -1,31 +1,89 @@
 /* ============================================================
-   AI 能力 ①：衣物抠图（segment）
+   AI 能力 ①：衣物识别 / 平铺图 / 自动标签（segment）
    ------------------------------------------------------------
-   输入 req：{ image: "data:image/jpeg;base64,..." }   用户拍的/相册选的衣服照片
-   输出    ：{ image: "data:image/png;base64,...",     抠好图的衣服（理想是透明底 PNG）
-               items: [ { image, category } ]          若一张图里有多件衣服，模型应拆分成多件
-             }
+   输入 req：{ image: "data:image/jpeg;base64,..." }   衣服照片或人物穿搭照
+   输出    ：{
+     image: 首件单品的图,                       // 兼容旧前端
+     items: [{
+       image: "data:image/...",                // 平铺图（生成失败时为原图）
+       category: "上衣|下装|鞋子|连体裙",       // 已映射产品四大分类
+       name: "颜色+细分类，如 白色T恤",
+       labels: { 类别, 颜色, 适用场景, 风格, 置信度 },   // 场景已映射（不确定→其他）
+     }],
+   }
 
-   ★★ 模型替换位置 ★★
-   把下面的占位实现换成真实抠图模型的调用即可，例如：
-     const resp = await fetch("https://模型服务商/v1/segment", {
-       method: "POST",
-       headers: { Authorization: `Bearer ${process.env.SEGMENT_API_KEY}` },
-       body: JSON.stringify({ image: req.image }),
-     });
-     const data = await resp.json();
-     return { image: data.cutoutImage, items: data.items };
-   密钥放环境变量（SEGMENT_API_KEY），不要写死在代码里。
+   流程（对应提示词库的模型2两步 + 模型3）：
+   1. 识别图中有哪些单品（Qwen3-VL · DETECT_PROMPT）
+   2. 逐件生成白底平铺图（GPT Image · flatImagePrompt），失败用原图兜底
+   3. 逐件打标签（Qwen3-VL · TAG_PROMPT），细分类映射到四大分类
+
+   替换模型：改 config.js 的 MODELS.vision / MODELS.flatImage
    ============================================================ */
+
+const { OPENROUTER_API_KEY, MODELS } = require("./config");
+const { chat, generateImage, imageMessage, parseJson } = require("./openrouter");
+const { DETECT_PROMPT, flatImagePrompt, TAG_PROMPT, CAT_MAP, mapScene } = require("./prompts");
+
+async function tagOne(image) {
+  try {
+    const text = await chat(MODELS.vision, imageMessage(TAG_PROMPT, image), { timeoutMs: 45000 });
+    return parseJson(text);
+  } catch (e) {
+    console.warn("打标签失败（用备用模型重试）:", e.message);
+    const text = await chat(MODELS.visionBackup, imageMessage(TAG_PROMPT, image), { timeoutMs: 45000 });
+    return parseJson(text);
+  }
+}
 
 module.exports = async function segment(req) {
   if (!req || !req.image) throw new Error("缺少 image 参数");
 
-  /* —— 占位实现：不做真实抠图，原图直接返回 ——
-     真实模型接入后：返回透明底抠图；多件衣服拆分成 items 数组 */
-  return {
-    image: req.image,
-    items: [{ image: req.image, category: "上衣" }],
-    mock: true,
-  };
+  /* 没配密钥 → 占位行为：原图直接返回 */
+  if (!OPENROUTER_API_KEY) {
+    return { image: req.image, items: [{ image: req.image, category: "上衣", name: "我的单品" }], mock: true };
+  }
+
+  /* 1. 识别有哪些单品 */
+  let detected = [];
+  try {
+    const text = await chat(MODELS.vision, imageMessage(DETECT_PROMPT, req.image), { timeoutMs: 60000 });
+    detected = (parseJson(text).items || []).slice(0, 3);   // 最多处理3件，控制耗时
+  } catch (e) {
+    console.warn("穿着识别失败:", e.message);
+  }
+  if (!detected.length) detected = [{ category: "上衣", description: "服装" }];
+
+  /* 2+3. 逐件：平铺图 + 标签（并行处理省时间） */
+  const items = await Promise.all(detected.map(async (d) => {
+    let flat = null;
+    try {
+      flat = await generateImage(MODELS.flatImage, flatImagePrompt(d.category, d.description || ""), req.image);
+    } catch (e) {
+      console.warn(`平铺图生成失败（${d.category}），用原图兜底:`, e.message);
+    }
+    const img = flat || req.image;
+
+    let labels = null;
+    try {
+      const raw = await tagOne(img);
+      labels = {
+        "类别": raw["类别"] || "不确定",
+        "颜色": raw["颜色"] || "不确定",
+        "适用场景": mapScene(raw["适用场景"]),
+        "风格": raw["风格"] || "不确定",
+        "置信度": raw["置信度"] || "低",
+      };
+    } catch (e) {
+      console.warn("打标签最终失败:", e.message);
+    }
+
+    const cat = (labels && CAT_MAP[labels["类别"]]) || CAT_MAP[d.category] || d.category || "上衣";
+    const name = labels && labels["颜色"] !== "不确定" && labels["类别"] !== "不确定"
+      ? `${labels["颜色"]}${labels["类别"]}`
+      : (d.description || "我的单品");
+
+    return { image: img, category: ["上衣","下装","鞋子","连体裙"].includes(cat) ? cat : "上衣", name, labels };
+  }));
+
+  return { image: items[0].image, items };
 };

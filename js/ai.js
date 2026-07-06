@@ -42,15 +42,25 @@ const AI = {
     return this._online;
   },
 
-  /* ---------- ① 衣物抠图 ---------- */
+  /* ---------- ⓪ 上传照片质检（创建模特前） ---------- */
+  async validatePhoto(image) {
+    if (await this.available()) {
+      try {
+        return await this._post("/api/validate-photo", { image }, 60000);
+      } catch (e) { console.warn("validate 后端失败，本地放行", e); }
+    }
+    return { pass: true, fail_reasons: [], primary_reason: "", mock: true };
+  },
+
+  /* ---------- ① 衣物识别/平铺图/标签 ---------- */
   async segment(image) {
     if (await this.available()) {
       try {
-        return await this._post("/api/segment", { image });
+        return await this._post("/api/segment", { image }, 240000);
       } catch (e) { console.warn("segment 后端失败，走本地模拟", e); }
     }
     /* 本地模拟：原图返回 */
-    return { image, items: [{ image, category: "上衣" }], mock: true };
+    return { image, items: [{ image, category: "上衣", name: "我的单品" }], mock: true };
   },
 
   /* ---------- ② 虚拟试穿 ----------
@@ -58,7 +68,7 @@ const AI = {
   async tryon(modelImage, items) {
     if (await this.available()) {
       try {
-        return await this._post("/api/tryon", { modelImage, items });
+        return await this._post("/api/tryon", { modelImage, items }, 240000);
       } catch (e) { console.warn("tryon 后端失败，走本地模拟", e); }
     }
     return { image: null, mock: true };

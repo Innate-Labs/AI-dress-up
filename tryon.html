@@ -364,14 +364,21 @@
     if (!f) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      toast("AI 正在抠图整理…");
+      toast("AI 正在识别整理…");
       const small = await compressImage(reader.result);
       const r = await AI.segment(small);
-      const cat = cFilter === "全部" ? "上衣" : cFilter;
-      const item = { id: "c" + Date.now(), name: "我的单品", cat, ph: "tee", dataUrl: r.image };
-      Store.set({ customItems: [...Store.get().customItems, item] });
+      const list = (r.items && r.items.length) ? r.items : [{ image: r.image || small, category: "上衣" }];
+      const newItems = list.map((d, i) => ({
+        id: "c" + Date.now() + "_" + i,
+        name: d.name || "我的单品",
+        cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
+        ph: "tee",
+        dataUrl: d.image || small,
+        labels: d.labels || null,
+      }));
+      Store.set({ customItems: [...Store.get().customItems, ...newItems] });
       renderMineGrid(); syncAIBtn();
-      toast("已添加到衣橱");
+      toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
     };
     reader.readAsDataURL(f);
     e.target.value = "";

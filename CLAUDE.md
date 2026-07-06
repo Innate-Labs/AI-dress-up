@@ -4,8 +4,10 @@
 
 ## 项目定位（最重要）
 
-这是一个**能跑起来的移动端网页产品**（从高保真原型升级而来）：功能真实可用，
-三个 AI 能力（抠图/试穿/搭配）目前是占位实现，后续由团队替换成选定的模型 API。
+这是一个**能跑起来的移动端网页产品**：功能真实可用，AI 能力已接真实模型
+（质检 qwen3.6-flash / 识别标签 qwen3-vl / 平铺图 gemini-3.1-flash-image 经 OpenRouter；
+试穿 aitryon-plus 经阿里云百炼）。搭配推荐暂为规则实现。
+密钥在 server/.env（不进 git）；换模型只改 server/ai/config.js 的 MODELS；提示词在 server/ai/prompts.js。
 
 - ✅ 做：页面 UI、真实交互、轻量后端 AI 接口层（占位实现，接口契约固定）
 - ❌ 不做：登录鉴权、数据库（数据存 localStorage）、自己训练模型

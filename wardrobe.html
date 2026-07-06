@@ -143,29 +143,32 @@
 
   renderCats(); renderItems();
 
-  /* 从添加衣服页带回的上传：调用 AI 抠图接口，完成后自动入橱 */
+  /* 从添加衣服页带回的上传：AI 识别/平铺/打标签，多件自动拆分后入橱 */
   const pending = Store.get().pendingUpload;
   if (pending) {
-    toast("上传成功，AI 正在后台抠图整理…");
+    toast("上传成功，AI 正在识别整理…");
     (async () => {
-      let img = pending === "ph" ? null : pending;
-      if (img) {
-        const r = await AI.segment(img);   // 抠图（占位实现原图返回，换真模型后返回抠图）
-        img = r.image || img;
+      let newItems;
+      if (pending === "ph") {
+        newItems = [{ id: "c" + Date.now(), name: "我的单品", cat: "上衣", ph: "tee", dataUrl: null }];
+      } else {
+        const r = await AI.segment(pending);
+        const list = (r.items && r.items.length) ? r.items : [{ image: r.image || pending, category: "上衣" }];
+        newItems = list.map((d, i) => ({
+          id: "c" + Date.now() + "_" + i,
+          name: d.name || "我的单品",
+          cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
+          ph: "tee",
+          dataUrl: d.image || pending,
+          labels: d.labels || null,
+        }));
       }
-      const item = {
-        id: "c" + Date.now(),
-        name: "我的单品",
-        cat: "上衣",
-        ph: "tee",
-        dataUrl: img,
-      };
       Store.set({
-        customItems: [...Store.get().customItems, item],
+        customItems: [...Store.get().customItems, ...newItems],
         pendingUpload: null,
       });
       renderCats(); renderItems();
-      toast("已添加到衣橱");
+      toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
     })();
   }
 </script>

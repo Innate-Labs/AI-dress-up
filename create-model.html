@@ -186,11 +186,11 @@
   <p>即将生成你的专属试衣模特…</p>
 </div>
 
-<!-- 检测失败弹窗 -->
+<!-- 检测失败弹窗（原因由 AI 质检返回） -->
 <div class="modal-mask" id="modalFail">
   <div class="modal">
     <h3>照片检测不合格</h3>
-    <p>照片中无人像</p>
+    <p id="failReason">照片不符合要求</p>
     <button class="btn btn-primary btn-block" onclick="closeModal('modalFail');openSheet('sheetTip')">重新上传</button>
     <button class="link" onclick="closeModal('modalFail')">稍后再说</button>
   </div>
@@ -198,6 +198,7 @@
 
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
+<script src="js/ai.js"></script>
 <script>
   renderStatusbar();
 
@@ -260,19 +261,15 @@
     }
   }
 
-  /* 拍照（演示失败路径） */
+  /* 拍照 / 相册：都走真实 AI 质检（模型1），通过才创建模特 */
   $("#btnCam").addEventListener("click", () => {
-    closeSheet("sheetTip");
-    $("#scanImg").src = "assets/ph/photo.svg";
-    $("#scanVeil").classList.add("show");
-    setTimeout(() => {
-      $("#scanVeil").classList.remove("show");
-      openModal("modalFail");
-    }, 1600);
+    $("#fileInput").setAttribute("capture", "environment");   // 手机上直接调起相机
+    $("#fileInput").click();
   });
-
-  /* 相册（真实选图 → 成功路径） */
-  $("#btnAlbum").addEventListener("click", () => $("#fileInput").click());
+  $("#btnAlbum").addEventListener("click", () => {
+    $("#fileInput").removeAttribute("capture");
+    $("#fileInput").click();
+  });
   $("#fileInput").addEventListener("change", e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -282,8 +279,11 @@
       const small = await compressImage(reader.result, 900, 0.8);
       $("#scanImg").src = small;
       $("#scanVeil").classList.add("show");
-      setTimeout(() => {
-        $("#scanVeil").classList.remove("show");
+
+      const r = await AI.validatePhoto(small);   // 真实质检
+      $("#scanVeil").classList.remove("show");
+
+      if (r.pass) {
         const id = "u" + Date.now();
         Store.set({
           models: [...Store.get().models, { id, name: "我的模特", dataUrl: small }],
@@ -291,9 +291,13 @@
         });
         toast("模特创建成功");
         renderMine();
-      }, 1800);
+      } else {
+        $("#failReason").textContent = r.primary_reason || "照片不符合要求";
+        openModal("modalFail");
+      }
     };
     reader.readAsDataURL(f);
+    e.target.value = "";
   });
 
   renderPresets(); renderMine();

@@ -14,6 +14,7 @@ const path = require("path");
 const segment = require("./ai/segment");
 const tryon = require("./ai/tryon");
 const recommend = require("./ai/recommend");
+const validate = require("./ai/validate");
 
 const app = express();
 const PORT = process.env.PORT || 8394;
@@ -25,6 +26,15 @@ app.use(express.json({ limit: "30mb" }));
 
 /* 健康检查：前端用它判断后端是否在线 */
 app.get("/api/health", (req, res) => res.json({ ok: true }));
+
+/* 照片质检：创建模特前判断照片是否合格 */
+app.post("/api/validate-photo", async (req, res) => {
+  try {
+    res.json(await validate(req.body));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 /* 抠图：上传衣服照片 → 返回抠好图的衣服 */
 app.post("/api/segment", async (req, res) => {
