@@ -53,8 +53,11 @@ app.post("/api/recommend", async (req, res) => {
   }
 });
 
-/* ---------- 托管前端静态页面（项目根目录） ---------- */
-app.use(express.static(path.join(__dirname, "..")));
+/* ---------- 托管前端静态页面（项目根目录） ----------
+   开发期禁用浏览器缓存：每次刷新都拿最新文件，避免手机看到旧版 */
+app.use(express.static(path.join(__dirname, ".."), {
+  setHeaders: (res) => res.setHeader("Cache-Control", "no-cache, must-revalidate"),
+}));
 
 app.listen(PORT, () => {
   console.log(`AI穿搭助手已启动 → http://localhost:${PORT}/login.html`);

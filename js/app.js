@@ -80,7 +80,7 @@ function renderStatusbar() {}
 if (!document.querySelector('meta[name="theme-color"]')) {
   const themeMeta = document.createElement("meta");
   themeMeta.name = "theme-color";
-  themeMeta.content = "#f0f6f1";
+  themeMeta.content = "#e9f5ee";
   document.head.appendChild(themeMeta);
 }
 
