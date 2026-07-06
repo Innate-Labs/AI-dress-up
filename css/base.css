@@ -38,8 +38,13 @@ html { background: #e9f5ee; }
 body {
   font-family: var(--font-body);
   color: var(--ink);
-  background: #e9e9e6;
+  /* 手机：最底层就是淡薄荷，Safari 状态栏区域取的正是这层颜色 */
+  background: #e9f5ee;
   -webkit-font-smoothing: antialiased;
+}
+/* 桌面：页面外围恢复灰色衬托手机画幅 */
+@media (min-width: 431px) {
+  body { background: #e9e9e6; }
 }
 
 /* ---------- 手机画幅 ---------- */
