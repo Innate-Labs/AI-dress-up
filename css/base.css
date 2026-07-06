@@ -59,13 +59,17 @@ body {
   .app { box-shadow: 0 0 60px rgba(0,0,0,.18); }
 }
 
-/* 顶部浅色氛围渐变（wearwow 式） */
+/* 顶部浅色氛围渐变（wearwow 式）
+   最顶部先铺一段与手机状态栏 theme-color(#f0f6f1) 完全相同的纯色，
+   再过渡进渐变，保证状态栏与页面无接缝 */
 .app::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 240px;
-  background: var(--grad-soft);
+  background:
+    linear-gradient(#f0f6f1 0, #f0f6f1 30px, rgba(240,246,241,0) 110px),
+    var(--grad-soft);
   mask-image: linear-gradient(#000 20%, transparent);
   -webkit-mask-image: linear-gradient(#000 20%, transparent);
   pointer-events: none;
