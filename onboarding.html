@@ -198,8 +198,11 @@
     if (answers.pref.includes("男装")) g.add("m");
     if (!g.size) { g.add("f"); g.add("m"); }
     stepItems = ITEMS.filter(i => g.has(i.gender));   // 该性别全部单品（含连体裙）
+    /* 返回改偏好后重进：剔除已不在列表里的选中项，避免看不见的衣服进衣橱 */
+    const ids = new Set(stepItems.map(i => i.id));
+    picked.forEach(id => { if (!ids.has(id)) picked.delete(id); });
     $("#itemsGrid").innerHTML = stepItems.map(it => `
-      <div class="item-cell" data-id="${it.id}">
+      <div class="item-cell ${picked.has(it.id) ? "sel" : ""}" data-id="${it.id}">
         ${itemImg(it)}
         <span class="ck"></span>
       </div>`).join("");
@@ -209,6 +212,7 @@
       c.classList.toggle("sel", picked.has(id));
       refreshSel();
     }));
+    refreshSel();
   }
   function refreshSel() {
     $("#selCount").textContent = `已选 ${picked.size} 件`;
