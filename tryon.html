@@ -469,29 +469,38 @@
   }
 
   /* + 号：打开系统相册选图 → 压缩 → AI 抠图 → 入橱 */
+  let uploading = false;   /* 识别进行中锁住 + 号，连点不再重复调用付费模型 */
   function bindAdd() {
-    $$("[data-add]").forEach(c => c.onclick = () => $("#fileInput").click());
+    $$("[data-add]").forEach(c => c.onclick = () => {
+      if (uploading) { toast("上一件还在识别中，稍等几秒再传"); return; }
+      $("#fileInput").click();
+    });
   }
   $("#fileInput").addEventListener("change", e => {
     const f = e.target.files[0];
     if (!f) return;
     const reader = new FileReader();
     reader.onload = async () => {
+      uploading = true;
       toast("AI 正在识别整理…");
-      const small = await compressImage(reader.result);
-      const r = await AI.segment(small);
-      const list = (r.items && r.items.length) ? r.items : [{ image: r.image || small, category: "上衣" }];
-      const newItems = list.map((d, i) => ({
-        id: "c" + Date.now() + "_" + i,
-        name: d.name || "我的单品",
-        cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
-        ph: "tee",
-        dataUrl: d.image || small,
-        labels: d.labels || null,
-      }));
-      Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
-      renderMineGrid(); syncAIBtn();
-      toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
+      try {
+        const small = await compressImage(reader.result);
+        const r = await AI.segment(small);
+        const list = (r.items && r.items.length) ? r.items : [{ image: r.image || small, category: "上衣" }];
+        const newItems = list.map((d, i) => ({
+          id: "c" + Date.now() + "_" + i,
+          name: d.name || "我的单品",
+          cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
+          ph: "tee",
+          dataUrl: d.image || small,
+          labels: d.labels || null,
+        }));
+        Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
+        renderMineGrid(); syncAIBtn();
+        toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
+      } finally {
+        uploading = false;
+      }
     };
     reader.readAsDataURL(f);
     e.target.value = "";
@@ -519,20 +528,26 @@
 
   async function aiMatch(around) {
     const btn = $("#btnAI");
+    if (btn.disabled) return;            /* 搭配请求进行中，连点不再重复调用付费模型 */
+    btn.disabled = true;
     btn.textContent = "✦ AI 搭配中…";
-    const r = await AI.recommend(wardrobeItems(), around);
-    if (r.items && r.items.length) {
-      wearing = r.items;
-      curOutfitId = null; genImage = null;
-      renderAll();
-      await applyTryon();
-      toast(r.reason
-        ? `AI：${r.reason}`
-        : (around ? "AI 已围绕这件衣服完成搭配" : "AI 已为你搭配一套新造型"));
-    } else {
-      toast("衣橱里的衣服不够搭一套，先多上传几件吧");
+    try {
+      const r = await AI.recommend(wardrobeItems(), around);
+      if (r.items && r.items.length) {
+        wearing = r.items;
+        curOutfitId = null; genImage = null;
+        renderAll();
+        await applyTryon();
+        toast(r.reason
+          ? `AI：${r.reason}`
+          : (around ? "AI 已围绕这件衣服完成搭配" : "AI 已为你搭配一套新造型"));
+      } else {
+        toast("衣橱里的衣服不够搭一套，先多上传几件吧");
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = "✦ AI 搭配我的衣服";
     }
-    btn.innerHTML = "✦ AI 搭配我的衣服";
   }
 
   $("#btnAI").addEventListener("click", () => {
