@@ -127,6 +127,7 @@
         <span style="color:var(--line)">|</span>
         <span id="selCount">已选 0 件</span>
       </div>
+      <button class="skip" id="btnSkipItems">稍后再选</button>
       <button class="btn btn-primary btn-block" id="btnFinish" disabled>请选择你已有的衣服</button>
     </div>
   </section>
@@ -252,6 +253,13 @@
       onboarded: true,
     });
     toast("衣橱创建成功");
+    setTimeout(() => location.href = "home.html", 600);
+  });
+  /* 一件都没有也能完成引导：空衣橱由 Store 兜底成基础款 */
+  $("#btnSkipItems").addEventListener("click", () => {
+    if (!navOk()) return;
+    Store.set({ wardrobe: [], profile: answers, onboarded: true });
+    toast("已为你准备了基础衣橱");
     setTimeout(() => location.href = "home.html", 600);
   });
 
