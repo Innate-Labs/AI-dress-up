@@ -69,7 +69,8 @@ function itemById(id) {
 }
 function wardrobeItems() {
   const s = Store.get();
-  return [...ITEMS.filter(i => s.wardrobe.includes(i.id)), ...s.customItems];
+  /* 用户自己上传的衣服排在最前面 */
+  return [...s.customItems, ...ITEMS.filter(i => s.wardrobe.includes(i.id))];
 }
 function inWardrobe(id) {
   const s = Store.get();

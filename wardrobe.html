@@ -167,7 +167,7 @@
         }));
       }
       Store.set({
-        customItems: [...Store.get().customItems, ...newItems],
+        customItems: [...newItems, ...Store.get().customItems],   /* 新上传排最前 */
         pendingUpload: null,
       });
       renderCats(); renderItems();

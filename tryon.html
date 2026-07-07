@@ -125,7 +125,7 @@
     background-origin: border-box;
     background-clip: padding-box, border-box;
   }
-  .dcell img { width: 100%; height: 100%; object-fit: contain; }
+  .dcell img { width: 100%; height: 100%; object-fit: contain; display: block; }
   .dcell.add {
     background: rgba(255,255,255,.08);
     display: flex; align-items: center; justify-content: center;
@@ -212,14 +212,34 @@
     return it.dataUrl || `assets/real/${it.id}.png`;
   }
 
+  /* 舞台底色自动取当前展示图片的边缘颜色，让照片与背景无缝衔接（占满上半屏） */
+  let stageCols = null;
+  function syncStageBg(src) {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = im.width; c.height = im.height;
+        const x = c.getContext("2d");
+        x.drawImage(im, 0, 0);
+        const col = (X, Y) => { const d = x.getImageData(X, Y, 1, 1).data; return `rgb(${d[0]},${d[1]},${d[2]})`; };
+        stageCols = [col(3, 3), col(3, im.height - 4)];
+        $(".stage").style.background = `linear-gradient(180deg, ${stageCols[0]} 0%, ${stageCols[1]} 100%)`;
+      } catch {}
+    };
+    im.src = src;
+  }
+
   /* 舞台渲染：有 AI 生成图用生成图，否则模特图 + 衣服按分类叠放 */
   function renderStage() {
     const m = curModel();
     const wrap = $("#modelWrap");
     if (genImage) {
       wrap.innerHTML = `<img class="gen" src="${genImage}" alt="试穿效果">`;
+      syncStageBg(genImage);
       return;
     }
+    syncStageBg(m.dataUrl || defaultModelSrc());
     wrap.innerHTML = `<img class="base" id="modelImg"
         src="${m.dataUrl || defaultModelSrc()}"
         onerror="this.onerror=null;this.src='assets/ph/model.svg'"
@@ -290,7 +310,8 @@
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#f2f2ef"); g.addColorStop(1, "#e6e6e2");
+    g.addColorStop(0, stageCols ? stageCols[0] : "#f2f2ef");
+    g.addColorStop(1, stageCols ? stageCols[1] : "#e6e6e2");
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
     const m = curModel();
@@ -392,7 +413,7 @@
         dataUrl: d.image || small,
         labels: d.labels || null,
       }));
-      Store.set({ customItems: [...Store.get().customItems, ...newItems] });
+      Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
       renderMineGrid(); syncAIBtn();
       toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
     };
