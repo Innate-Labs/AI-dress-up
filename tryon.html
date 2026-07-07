@@ -70,6 +70,15 @@
     color: var(--muted);
     box-shadow: none;
   }
+  /* 真实试穿生成中的状态提示 */
+  .gen-status {
+    position: absolute; left: 50%; top: 62px; transform: translateX(-50%);
+    z-index: 6; display: none; align-items: center;
+    padding: 9px 16px; border-radius: 999px;
+    background: rgba(16,16,18,.85); color: #fff;
+    font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .gen-status.show { display: flex; }
 
   /* 底部抽屉 */
   .drawer {
@@ -155,6 +164,7 @@
     </div>
 
     <button class="btn ai-pill ai-match" id="btnAI">✦ AI 搭配我的衣服</button>
+    <div class="gen-status" id="genStatus">✦ AI 试穿生成中，约需 20 秒…</div>
   </div>
 
   <div class="drawer">
@@ -252,17 +262,71 @@
       }).join("");
   }
 
-  /* 调用试穿接口：真模型返回整图则展示整图，占位实现返回 null 则本地叠图 */
-  async function applyTryon() {
+  /* ---------- 真实试穿：每次换装自动生成 ----------
+     系统衣服/默认模特是图片文件，先转成 dataURL 再发给模型；
+     衣服平铺图铺白底转 JPEG（透明 PNG 直接转会发黑）。转换结果缓存。 */
+  const srcCache = new Map();
+  function srcToDataUrl(src, maxW = 1000) {
+    if (!src) return Promise.resolve(null);
+    if (src.startsWith("data:")) return Promise.resolve(src);
+    if (srcCache.has(src)) return srcCache.get(src);
+    const p = new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    srcCache.set(src, p);
+    return p;
+  }
+  async function itemDataUrl(it) {
+    if (it.dataUrl) return it.dataUrl;
+    return (await srcToDataUrl(`assets/real/${it.id}.png`))
+        || (await srcToDataUrl(`assets/real/${it.id}.jpg`));
+  }
+
+  /* 换装后 600ms 内没有新动作才真正调用，防止连点造成一串付费请求；
+     同一模特+同一身衣服的生成结果缓存，来回切换不重复计费 */
+  let tryonSeq = 0, tryonTimer = null;
+  const genCache = new Map();
+  function applyTryon() {
+    clearTimeout(tryonTimer);
+    tryonTimer = setTimeout(doTryon, 600);
+  }
+  async function doTryon() {
+    const seq = ++tryonSeq;
     const m = curModel();
-    const items = wearing.map(id => {
-      const it = itemById(id);
-      return it ? { id: it.id, category: it.cat, image: it.dataUrl || null } : null;
-    }).filter(Boolean);
-    try {
-      const r = await AI.tryon(m.dataUrl || null, items);
-      genImage = r && r.image ? r.image : null;
-    } catch { genImage = null; }
+    const key = (m.id || "m0") + "|" + [...wearing].sort().join(",");
+    let img;
+    if (genCache.has(key)) {
+      img = genCache.get(key);
+    } else {
+      $("#genStatus").classList.add("show");
+      try {
+        const modelImage = m.dataUrl || await srcToDataUrl(defaultModelSrc(), 1200);
+        const items = [];
+        for (const id of wearing) {
+          const it = itemById(id);
+          if (it) items.push({ id: it.id, category: it.cat, image: await itemDataUrl(it) });
+        }
+        const r = await AI.tryon(modelImage, items);
+        img = r && r.image ? r.image : null;
+      } catch { img = null; }
+      if (img) genCache.set(key, img);
+    }
+    if (seq !== tryonSeq) return;    /* 等待期间又换了衣服，丢弃过期结果 */
+    $("#genStatus").classList.remove("show");
+    genImage = img;
     renderStage();
     saveSnapshot();
   }
@@ -276,7 +340,10 @@
     if (last && (last.items || []).slice().sort().join(",") === key) return;  // 连续重复不存
 
     let image = genImage;
-    if (!image) {
+    if (image) {
+      /* 生成图较大，压小再进 localStorage，防超限 */
+      try { image = await compressImage(image, 480, 0.62); } catch {}
+    } else {
       try { image = await composeSnapshot(); } catch { image = null; }
     }
     const o = OUTFITS.find(x => x.id === curOutfitId);
