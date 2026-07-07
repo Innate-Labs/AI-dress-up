@@ -16,7 +16,7 @@
 <div class="app">
 
   <div class="pagehead">
-    <button class="iconbtn" onclick="history.back()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"/></svg></button>
+    <button class="iconbtn" onclick="history.length > 1 ? history.back() : location.href='login.html'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 5 8 12l6.5 7"/></svg></button>
     <div class="head-title">注册</div>
     <span style="width:40px"></span>
   </div>
@@ -49,6 +49,9 @@
 <script>
   renderStatusbar();
 
+  /* iOS 手势返回经 bfcache 恢复时刷新，避免按钮残留“注册中…”态 */
+  window.addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
+
   const inputs = ["#email", "#code", "#pwd"].map(s => $(s));
   function check() {
     $("#btnReg").disabled = !(inputs.every(i => i.value.trim()) && $("#agreeChk").checked);
@@ -76,6 +79,7 @@
   });
 
   $("#btnReg").addEventListener("click", () => {
+    $("#btnReg").disabled = true;   /* 防连点重复注册 */
     $("#btnReg").textContent = "注册中…";
     setTimeout(() => {
       toast("注册成功");
