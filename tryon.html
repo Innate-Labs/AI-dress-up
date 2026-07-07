@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="css/base.css">
 <style>
   body { background: #f2f2ef; }
-  .app { background: #ecece9; }
+  /* 锁定为一屏：模特舞台固定不随页面滚走，只有抽屉内的衣服网格滚动（同 onboarding 的做法） */
+  .app { background: #ecece9; height: 100dvh; min-height: 0; }
   /* 模特舞台 */
   .stage {
     position: relative;
