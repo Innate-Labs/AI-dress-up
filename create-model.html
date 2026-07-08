@@ -270,9 +270,13 @@
           <button class="btn btn-primary btn-block rise d2" onclick="confirmMine('${cur.id}', this)">确认</button>
         </div>`;
       $("[data-del]")?.addEventListener("click", () => {
+        const s2 = Store.get();
+        const rest = s2.models.filter(m => m.id !== cur.id);
         Store.set({
-          models: Store.get().models.filter(m => m.id !== cur.id),
-          curModel: "m1",
+          models: rest,
+          /* 删的是当前生效模特 → 顺位切到剩余第一张照片、没有照片才回默认模特，
+             保证页面显示的照片始终=实际生效模特；删的不是当前模特 → 当前模特不动 */
+          curModel: s2.curModel === cur.id ? (rest.find(m => m.dataUrl)?.id || "m1") : s2.curModel,
         });
         renderMine();
         toast("已删除该照片");
