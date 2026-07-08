@@ -628,6 +628,18 @@
   }
   renderCatChips(); renderSceneChipsD(); renderAll();
   if (!aiAround) applyTryon();
+
+  /* 手机返回本页常走 bfcache（页面连内存一起原样恢复、不重新加载），期间在创建模特页
+     换过模特的话台上还是旧人。恢复瞬间强制重读 localStorage：模特换了 → 作废旧生成图、
+     立即显示新模特并进加载态重新生成；没换 → applyTryon 命中缓存秒显原图，不产生费用 */
+  window.addEventListener("pageshow", e => {
+    if (!e.persisted) return;
+    const prev = Store.get().curModel;
+    Store._cache = null;
+    if (Store.get().curModel !== prev) genImage = null;
+    renderAll();
+    applyTryon();
+  });
 </script>
 </body>
 </html>
