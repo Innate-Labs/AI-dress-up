@@ -22,8 +22,9 @@ module.exports = async function tryon(req) {
 
   const isReal = (img) => typeof img === "string" && img.startsWith("data:");
 
-  /* 生成前提：有密钥 + 模特是真实照片。缺任一 → 返回 null，前端叠图兜底 */
-  if (!OPENROUTER_API_KEY || !isReal(req.modelImage)) return { image: null };
+  /* 生成前提：有密钥 + 模特是真实照片。缺任一 → 预期降级（mock），前端走叠图演示模式；
+     区别于下面 API 调用失败返回的 {image:null}——那是真失败，前端保持原画面并提示重试 */
+  if (!OPENROUTER_API_KEY || !isReal(req.modelImage)) return { image: null, mock: true };
 
   /* 收集真实衣服图，按 上衣/连体裙 → 下装 → 鞋子 的顺序（与提示词里的序号对应） */
   const top = req.items.find((i) => isReal(i.image) && (i.category === "上衣" || i.category === "连体裙"));

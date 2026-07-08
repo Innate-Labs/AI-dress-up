@@ -216,6 +216,8 @@
   let aiAround = null;
   let genImage = null;        // 真模型返回的整图结果（占位实现下为 null）
   let generating = false;     // 是否正在生成（生成中显示加载态，不显示临时叠图）
+  let offlineOverlay = false; // 无密钥/后端不在线的演示模式：兜底允许平铺叠图（双击HTML也能用）；
+                              // 线上真生成失败不叠图——保持台上原样并 toast 重试
 
   /* 初始状态：?outfit= / ?items= / ?item= */
   if (qs.get("outfit")) {
@@ -290,11 +292,14 @@
       return;
     }
     setLoading(false);
-    /* 兜底叠图：仅在没配密钥/生成失败时走到这里 */
-    wrap.innerHTML = `<img class="base" id="modelImg"
+    const base = `<img class="base" id="modelImg"
         src="${m.dataUrl || defaultModelSrc()}"
         onerror="this.onerror=null;this.src='assets/ph/model.svg'"
-        style="${m.dataUrl ? "border-radius:18px" : ""}" alt="试衣模特">` +
+        style="${m.dataUrl ? "border-radius:18px" : ""}" alt="试衣模特">`;
+    /* 线上真生成失败走不到叠图：doTryon 保留旧生成图并 toast，这里只剩"什么都没穿"的纯模特 */
+    if (!offlineOverlay) { wrap.innerHTML = base; return; }
+    /* 无密钥/后端不在线的演示模式：平铺叠图保底，双击 HTML 也能用 */
+    wrap.innerHTML = base +
       wearing.map(id => {
         const it = itemById(id);
         if (!it) return "";
@@ -342,6 +347,9 @@
   const genCache = new Map();
   function applyTryon() {
     clearTimeout(tryonTimer);
+    if (!wearing.length) {           /* 身上没有任何衣服：不发生成请求、不进加载态，显示纯模特 */
+      generating = false; genImage = null; renderStage(); return;
+    }
     const m = curModel();
     const key = (m.id || "m0") + "|" + [...wearing].sort().join(",");
     if (genCache.has(key)) { doTryon(); return; }   /* 命中缓存：立即出图，无加载态 */
@@ -354,7 +362,7 @@
     const m = curModel();
     /* 缓存 key 含全部单品（含鞋子）：生图模型把鞋子也一起生成，换鞋会改变结果图，需重新生成 */
     const key = (m.id || "m0") + "|" + [...wearing].sort().join(",");
-    let img;
+    let img, mock = false;
     if (genCache.has(key)) {
       img = genCache.get(key);
     } else {
@@ -369,14 +377,25 @@
         }
         const r = await AI.tryon(modelImage, items);
         img = r && r.image ? r.image : null;
+        mock = !!(r && r.mock);      /* mock=无密钥/后端不在线的预期降级，不算失败 */
       } catch { img = null; }
       if (img) genCache.set(key, img);
     }
     if (seq !== tryonSeq) return;    /* 等待期间又换了衣服，丢弃过期结果 */
     generating = false;
-    genImage = img;
-    renderStage();
-    saveSnapshot();
+    if (img) {                       /* 成功：衣服直接上身 */
+      genImage = img;
+      renderStage();
+      saveSnapshot();
+    } else if (mock) {               /* 演示模式：叠图保底（双击 HTML 也能用） */
+      offlineOverlay = true;
+      genImage = null;
+      renderStage();
+      saveSnapshot();
+    } else {                         /* 真生成失败：台上保持原样（旧生成图或纯模特），提示重试 */
+      renderStage();
+      toast("生成失败，请重试");
+    }
   }
 
   /* ---------- 试衣间快照：每次完整试穿自动记录 ---------- */
