@@ -345,6 +345,8 @@
      同一模特+同一身衣服的生成结果缓存，来回切换不重复计费 */
   let tryonSeq = 0, tryonTimer = null;
   const genCache = new Map();
+  const failCache = new Map();     /* 失败组合 → 失败时刻；冷静期内同组合不再发请求，防反复计费 */
+  const FAIL_COOLDOWN = 10000;     /* 冷静期 10 秒（产品负责人定），期间重试只提示不请求 */
   function applyTryon() {
     clearTimeout(tryonTimer);
     if (!wearing.length) {           /* 身上没有任何衣服：不发生成请求、不进加载态，显示纯模特 */
@@ -353,6 +355,10 @@
     const m = curModel();
     const key = (m.id || "m0") + "|" + [...wearing].sort().join(",");
     if (genCache.has(key)) { doTryon(); return; }   /* 命中缓存：立即出图，无加载态 */
+    if (Date.now() - (failCache.get(key) || 0) < FAIL_COOLDOWN) {
+      toast("刚失败过，请稍等几秒再试");             /* 冷静期内：不发请求不花钱，台上保持原样 */
+      return;
+    }
     generating = true;
     renderStage();                                   /* 未缓存：立即进加载态，等待期不显示临时叠图 */
     tryonTimer = setTimeout(doTryon, 600);
@@ -393,6 +399,7 @@
       renderStage();
       saveSnapshot();
     } else {                         /* 真生成失败：台上保持原样（旧生成图或纯模特），提示重试 */
+      failCache.set(key, Date.now());
       renderStage();
       toast("生成失败，请重试");
     }
