@@ -22,7 +22,15 @@
 
 const { OPENROUTER_API_KEY, MODELS } = require("./config");
 const { chat, generateImage, imageMessage, parseJson } = require("./openrouter");
-const { DETECT_PROMPT, flatImagePrompt, TAG_PROMPT, CAT_MAP, mapScene } = require("./prompts");
+const {
+  DETECT_PROMPT,
+  flatImagePrompt,
+  flatQcPrompt,
+  repairFlatImagePrompt,
+  TAG_PROMPT,
+  CAT_MAP,
+  mapScene,
+} = require("./prompts");
 
 async function tagOne(image) {
   try {
@@ -32,6 +40,46 @@ async function tagOne(image) {
     console.warn("打标签失败（用备用模型重试）:", e.message);
     const text = await chat(MODELS.visionBackup, imageMessage(TAG_PROMPT, image), { timeoutMs: 45000 });
     return parseJson(text);
+  }
+}
+
+async function checkFlat(image, category) {
+  try {
+    const text = await chat(MODELS.vision, imageMessage(flatQcPrompt(category), image), { timeoutMs: 45000 });
+    const r = parseJson(text);
+    return {
+      pass: !!r.pass,
+      reason: r.primary_reason || (r.fail_reasons || []).join("、") || r.short_observation || "",
+    };
+  } catch (e) {
+    console.warn("平铺图质检失败（放行生成图）:", e.message);
+    return { pass: true, reason: "" };
+  }
+}
+
+async function generateCleanFlat(reqImage, detected) {
+  const category = detected.category || "服装";
+  const description = detected.description || "";
+
+  const first = await generateImage(MODELS.flatImage, flatImagePrompt(category, description), reqImage);
+  const qc = await checkFlat(first, category);
+  if (qc.pass) return first;
+
+  console.warn(`平铺图质检不通过（${category}），重试生成:`, qc.reason || "未知原因");
+  try {
+    const retry = await generateImage(
+      MODELS.flatImage,
+      repairFlatImagePrompt(category, description, qc.reason),
+      reqImage
+    );
+    const retryQc = await checkFlat(retry, category);
+    if (!retryQc.pass) {
+      console.warn(`平铺图重试后仍不理想（${category}）:`, retryQc.reason || "未知原因");
+    }
+    return retry;
+  } catch (e) {
+    console.warn(`平铺图重试失败（${category}），使用第一次生成结果:`, e.message);
+    return first;
   }
 }
 
@@ -57,7 +105,7 @@ module.exports = async function segment(req) {
   const items = await Promise.all(detected.map(async (d) => {
     let flat = null;
     try {
-      flat = await generateImage(MODELS.flatImage, flatImagePrompt(d.category, d.description || ""), req.image);
+      flat = await generateCleanFlat(req.image, d);
     } catch (e) {
       console.warn(`平铺图生成失败（${d.category}），用原图兜底:`, e.message);
     }
