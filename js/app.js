@@ -59,7 +59,7 @@ const Store = {
     /* localStorage 约 5MB 且每次整份重写，塞满时 setItem 会抛异常中断当前操作。
        兜底：从最老的试衣间快照开始丢（占空间的主要是图），腾出地方再存；
        全丢完还存不下就提示用户，页面继续用内存数据跑，不再中断流程。
-       （临时方案，经产品负责人授权修改本公共文件，方案后续可能调整） */
+       （经产品负责人授权添加，刘倩已确认为正式方案 2026-07-08） */
     const save = () => localStorage.setItem(this.KEY, JSON.stringify(this._cache));
     try { save(); }
     catch {
