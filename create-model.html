@@ -210,6 +210,14 @@
     $("#paneMine").classList.toggle("hidden", b.dataset.t !== "mine");
   }));
 
+  /* 选完模特自动返回的防重入锁：连点只预约一次返回（手机上双击会连退两级、跳过试穿页）；
+     直开本页没有上一页可退时，兜底跳试穿页，保证「确认」点了必有下文 */
+  let leaving = false;
+  function backToTryon(delay) {
+    leaving = true;
+    setTimeout(() => history.length > 1 ? history.back() : location.href = "tryon.html", delay);
+  }
+
   /* 预设模特（PRESET_MODELS 在 js/data.js，默认全部在模特列表里） */
   function renderPresets() {
     const s = Store.get();
@@ -219,11 +227,22 @@
         <img src="${defaultModelSrc()}" onerror="this.onerror=null;this.src='assets/ph/model.svg'">
       </div>`).join("");
     $$("[data-p]").forEach(c => c.addEventListener("click", () => {
+      if (leaving) return;             /* 已在返回途中，忽略连点 */
       Store.set({ curModel: c.dataset.p });
       renderPresets();
       toast(`已选用「${c.dataset.nm}」`);
-      setTimeout(() => history.back(), 700);
+      backToTryon(700);
     }));
+  }
+
+  /* 「我的照片」确认：上锁防连点（按钮变灰），预约返回 */
+  function confirmMine(id, btn) {
+    if (leaving) return;
+    Store.set({ curModel: id });
+    toast("已设为当前模特");
+    btn.disabled = true;
+    btn.textContent = "正在返回…";
+    backToTryon(600);
   }
 
   /* 我的照片 */
@@ -248,7 +267,7 @@
           </div>
           <button class="add-model rise d1" onclick="openSheet('sheetTip')"><span class="plus">＋</span>添加模特</button>
           <div style="height:14px"></div>
-          <button class="btn btn-primary btn-block rise d2" onclick="Store.set({curModel:'${cur.id}'});toast('已设为当前模特');setTimeout(()=>history.back(),600)">确认</button>
+          <button class="btn btn-primary btn-block rise d2" onclick="confirmMine('${cur.id}', this)">确认</button>
         </div>`;
       $("[data-del]")?.addEventListener("click", () => {
         Store.set({
