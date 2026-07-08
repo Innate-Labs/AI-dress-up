@@ -90,10 +90,14 @@ const AI = {
         if (r && Array.isArray(r.items) && r.items.length) return r;
       } catch (e) { console.warn("recommend 后端失败，走本地模拟", e); }
     }
-    /* 本地模拟：与后端占位实现相同的规则 */
+    /* 本地模拟：与后端占位实现相同的规则。
+       系统款按用户的服饰性别偏好过滤（与 app.js 的 prefGenders 同一口径），
+       用户自己上传的衣服（dataUrl）不限性别 */
     const pick = list => list[Math.floor(Math.random() * list.length)];
+    const genders = prefGenders();
     const byCat = (cat, ex) => {
-      const pool = wardrobe.filter(i => i.cat === cat && i.id !== ex);
+      const pool = wardrobe.filter(i => i.cat === cat && i.id !== ex
+        && (i.dataUrl || !i.gender || genders.has(i.gender)));
       const mine = pool.filter(i => i.dataUrl);
       const list = mine.length ? mine : pool;
       return list.length ? pick(list).id : null;
