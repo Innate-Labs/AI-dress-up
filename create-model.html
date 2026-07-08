@@ -149,6 +149,8 @@
   <!-- 预设模特 -->
   <div id="panePreset" class="hidden">
     <div class="preset-grid" id="presetGrid"></div>
+    <div style="height:18px"></div>
+    <button class="btn btn-primary btn-block" id="btnPresetOk">确认</button>
   </div>
 
   <!-- 我的照片 -->
@@ -218,22 +220,31 @@
     setTimeout(() => history.length > 1 ? history.back() : location.href = "tryon.html", delay);
   }
 
-  /* 预设模特（PRESET_MODELS 在 js/data.js，默认全部在模特列表里） */
+  /* 预设模特（PRESET_MODELS 在 js/data.js，默认全部在模特列表里）
+     两条路径统一为"停留确认"（产品负责人定）：点卡片只选中高亮，点「确认」才生效并返回 */
+  let pickedPreset = null;
   function renderPresets() {
     const s = Store.get();
+    const sel = pickedPreset || s.curModel;
     $("#presetGrid").innerHTML = PRESET_MODELS.map(p => `
-      <div class="preset ${s.curModel === p.id ? "on" : ""}" data-p="${p.id}" data-nm="${p.name}">
+      <div class="preset ${sel === p.id ? "on" : ""}" data-p="${p.id}" data-nm="${p.name}">
         <span class="nm">${p.name}</span>
         <img src="${defaultModelSrc()}" onerror="this.onerror=null;this.src='assets/ph/model.svg'">
       </div>`).join("");
     $$("[data-p]").forEach(c => c.addEventListener("click", () => {
-      if (leaving) return;             /* 已在返回途中，忽略连点 */
-      Store.set({ curModel: c.dataset.p });
+      pickedPreset = c.dataset.p;
       renderPresets();
-      toast(`已选用「${c.dataset.nm}」`);
-      backToTryon(700);
     }));
   }
+  $("#btnPresetOk").addEventListener("click", () => {
+    if (leaving) return;               /* 已在返回途中，忽略连点 */
+    const p = PRESET_MODELS.find(x => x.id === (pickedPreset || Store.get().curModel)) || PRESET_MODELS[0];
+    Store.set({ curModel: p.id });
+    toast(`已选用「${p.name}」`);
+    $("#btnPresetOk").disabled = true;
+    $("#btnPresetOk").textContent = "正在返回…";
+    backToTryon(600);
+  });
 
   /* 「我的照片」确认：上锁防连点（按钮变灰），预约返回 */
   function confirmMine(id, btn) {
@@ -246,6 +257,7 @@
   }
 
   /* 我的照片 */
+  let mineShow = null;   /* 刚上传、还没点「确认」生效的候选照片 id（优先展示） */
   function renderMine() {
     const mine = Store.get().models.filter(m => m.dataUrl);
     if (!mine.length) {
@@ -258,7 +270,7 @@
         </div>`;
     } else {
       const s = Store.get();
-      const cur = mine.find(m => m.id === s.curModel) || mine[0];
+      const cur = mine.find(m => m.id === mineShow) || mine.find(m => m.id === s.curModel) || mine[0];
       $("#paneMine").innerHTML = `
         <div class="my-list">
           <div class="big-photo rise">
@@ -272,6 +284,7 @@
       $("[data-del]")?.addEventListener("click", () => {
         const s2 = Store.get();
         const rest = s2.models.filter(m => m.id !== cur.id);
+        if (cur.id === mineShow) mineShow = null;   /* 删的是候选照片，候选作废 */
         Store.set({
           models: rest,
           /* 删的是当前生效模特 → 顺位切到剩余第一张照片、没有照片才回默认模特，
@@ -308,11 +321,12 @@
 
       if (r.pass) {
         const id = "u" + Date.now();
+        /* 统一为"停留确认"：上传成功只入库并作为候选展示，点「确认」才真正生效 */
         Store.set({
           models: [...Store.get().models, { id, name: "我的模特", dataUrl: small }],
-          curModel: id,
         });
-        toast("模特创建成功");
+        mineShow = id;
+        toast("模特创建成功，点「确认」使用");
         renderMine();
       } else {
         $("#failReason").textContent = r.primary_reason || "照片不符合要求";
