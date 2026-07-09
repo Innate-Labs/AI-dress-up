@@ -23,8 +23,9 @@ module.exports = {
     qc: "qwen/qwen3.6-flash",                    // 模型1 照片质检
     vision: "qwen/qwen3-vl-30b-a3b-instruct",    // 模型2第1步 穿着识别 + 模型3 打标签（主力）
     visionBackup: "qwen/qwen3-vl-8b-instruct",   // 模型3 备用
-    /* 平铺图生成：gemini 约15秒/张；追求更高质量可换 "openai/gpt-5.4-image-2"（约2.5分钟/张，实测更精致） */
-    flatImage: "google/gemini-3.1-flash-image",  // 模型2第2步 平铺图生成
+    /* 平铺图生成：qwen-image-edit（DashScope 百炼图生图，约15-20秒/张，实测拆分保真好）
+       备选 OpenRouter "google/gemini-3.1-flash-image"（更快更便宜，但偶尔不抠图直接返回整图） */
+    flatImage: "qwen-image-edit",  // 模型2第2步 平铺图生成（走 DashScope，见 segment.js）
     tryon: "aitryon-plus",                       // 模型4 试穿（DashScope）
     recommend: "qwen/qwen3.6-flash",             // 模型5 搭配推荐（读标签做选择，快且便宜）
   },
