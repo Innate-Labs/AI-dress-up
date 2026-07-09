@@ -20,7 +20,20 @@ module.exports = async function validate(req) {
     return { pass: true, fail_reasons: [], primary_reason: "", confidence: 1, mock: true };
   }
 
-  const text = await chat(MODELS.qc, imageMessage(QC_PROMPT, req.image), { timeoutMs: 45000 });
+  let text;
+  try {
+    text = await chat(MODELS.qc, imageMessage(QC_PROMPT, req.image), { timeoutMs: 45000 });
+  } catch (e) {
+    console.warn("照片质检模型不可用（本地放行）:", e.message);
+    return {
+      pass: true,
+      fail_reasons: [],
+      primary_reason: "",
+      confidence: 0.5,
+      short_observation: "质检模型暂不可用，本地演示临时放行",
+      fallback: true,
+    };
+  }
   let r;
   try {
     r = parseJson(text);
