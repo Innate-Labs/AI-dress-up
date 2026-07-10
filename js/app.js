@@ -256,6 +256,54 @@ function compressImage(dataUrl, maxW = 800, quality = 0.8) {
   });
 }
 
+/* 生成单品图的白边裁剪+方形规整（含压缩，入橱用它替代 compressImage）：
+   qwen-image-edit 输出跟随输入图比例，竖幅全身照会产出高瘦画布——单品缩在中间、
+   上下大片空白，放进方形衣橱卡片就显得特别小。
+   做法：扫描非白像素的边界框 → 裁掉四周空白 → 6% 留边 → 补成正方形白底 → 压缩输出。
+   近白(≥245)才算背景，白裤等浅色单品靠内部阴影褶皱不会被误裁；全白/异常图原样返回 */
+function trimToSquare(dataUrl, maxW = 800, quality = 0.8) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const cv = document.createElement("canvas");
+        cv.width = img.width; cv.height = img.height;
+        const ctx = cv.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const { data } = ctx.getImageData(0, 0, cv.width, cv.height);
+        let top = cv.height, bottom = -1, left = cv.width, right = -1;
+        for (let y = 0; y < cv.height; y++) {
+          for (let x = 0; x < cv.width; x++) {
+            const i = (y * cv.width + x) * 4;
+            if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) {
+              if (x < left) left = x;
+              if (x > right) right = x;
+              if (y < top) top = y;
+              if (y > bottom) bottom = y;
+            }
+          }
+        }
+        if (bottom < 0 || right - left < 10 || bottom - top < 10) { resolve(dataUrl); return; }
+        const bw = right - left + 1, bh = bottom - top + 1;
+        const pad = Math.round(Math.max(bw, bh) * 0.06);
+        const side = Math.max(bw, bh) + pad * 2;
+        const scale = Math.min(1, maxW / side);
+        const out = document.createElement("canvas");
+        out.width = out.height = Math.round(side * scale);
+        const octx = out.getContext("2d");
+        octx.fillStyle = "#fff";
+        octx.fillRect(0, 0, out.width, out.height);
+        octx.drawImage(cv, left, top, bw, bh,
+          Math.round((side / 2 - bw / 2) * scale), Math.round((side / 2 - bh / 2) * scale),
+          Math.round(bw * scale), Math.round(bh * scale));
+        resolve(out.toDataURL("image/jpeg", quality));
+      } catch { resolve(dataUrl); }
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 const fmtTime = ts => {
   const d = new Date(ts);
   return `${d.getMonth() + 1}月${d.getDate()}日`;

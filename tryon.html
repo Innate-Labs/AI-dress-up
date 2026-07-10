@@ -555,13 +555,13 @@
         const small = await compressImage(reader.result);
         const r = await AI.segment(small);
         const list = (r.items && r.items.length) ? r.items : [{ image: r.image || small, category: "上衣" }];
-        /* 生成的平铺图是全尺寸大图，入橱前必须压缩，防止一次上传撑爆 localStorage */
+        /* 生成图入橱前：裁白边+方形规整+压缩（trimToSquare），修复高瘦画布在方形卡片里显得极小 */
         const newItems = await Promise.all(list.map(async (d, i) => ({
           id: "c" + Date.now() + "_" + i,
           name: d.name || "我的单品",
           cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
           ph: "tee",
-          dataUrl: await compressImage(d.image || small),
+          dataUrl: await trimToSquare(d.image || small),
           labels: d.labels || null,
         })));
         const saved = Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
