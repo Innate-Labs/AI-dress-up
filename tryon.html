@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f2f2ef">
 <title>模特试穿 · AI穿搭助手</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <style>
   body { background: #f2f2ef; }
@@ -668,7 +667,9 @@
 
   /* 手机返回本页常走 bfcache（页面连内存一起原样恢复、不重新加载），期间在创建模特页
      换过模特的话台上还是旧人。恢复瞬间强制重读 localStorage：模特换了 → 作废旧生成图、
-     立即显示新模特并进加载态重新生成；没换 → applyTryon 命中缓存秒显原图，不产生费用 */
+     立即显示新模特并进加载态重新生成；没换 → applyTryon 命中缓存秒显原图，不产生费用。
+     （KEEP_BFCACHE：豁免 app.js 的全局刷新兜底——本页刷新会重复触发付费生成） */
+  window.KEEP_BFCACHE = true;
   window.addEventListener("pageshow", e => {
     if (!e.persisted) return;
     const prev = Store.get().curModel;

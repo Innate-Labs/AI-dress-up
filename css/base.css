@@ -4,6 +4,15 @@
    胶囊按钮 / 大圆角卡片 / 粉→薄荷绿渐变仅用于 AI 能力点缀
    ============================================================ */
 
+/* 展示字体自托管（原 Google Fonts 外链国内连不上：轻则回退系统字体，重则拖慢首屏）*/
+@font-face {
+  font-family: "Archivo Black";
+  src: url("../assets/fonts/archivo-black.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ink: #101012;          /* 主文字 · 近黑 */
   --ink-2: #55555a;        /* 次级文字 */
@@ -298,6 +307,7 @@ body {
   border-radius: var(--r-md);
   background: #fff;
   visibility: hidden;   /* 加载成功才显示（onload），避免白底挡住拼贴 */
+  pointer-events: none; /* 整图只做展示：不挡下层单品点击（详情页替换入口在整图之下） */
 }
 
 /* ---------- 通用工具 ---------- */

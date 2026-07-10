@@ -15,6 +15,16 @@ function resetDemoData() {
   location.href = "login.html";
 }
 
+/* bfcache 恢复兜底（全站）：手机手势返回时页面连内存一起原样恢复，Store 的内存缓存
+   还是离开前的旧快照，在它之上任何一次写回都会覆掉其他页面刚产生的数据（收藏/衣橱/历史）。
+   默认整页刷新取最新状态；个别页面（试穿页）刷新会重复触发付费生成，
+   可在自己脚本里设 window.KEEP_BFCACHE = true 并自行处理恢复逻辑 */
+window.addEventListener("pageshow", (e) => {
+  if (!e.persisted) return;
+  if (window.KEEP_BFCACHE) return;
+  location.reload();
+});
+
 /* ---------- 本地状态（localStorage） ---------- */
 const Store = {
   KEY: "aiwd-state",
@@ -200,8 +210,12 @@ function renderChips(container, list, onPick, active = 0) {
 
 /* 默认虚拟模特图：按性别偏好选 assets/real/model-f.png 或 model-m.png，没图自动回退剪影 */
 function defaultModelSrc() {
+  /* 偏好唯一时按偏好；偏好含糊（双选/没答）时用引导问卷第1步的性别兜底，
+     兑现"选择性别，以定制你的专属试衣模特"的文案承诺 */
   const g = prefGenders();
-  const gender = (g.size === 1 && g.has("m")) ? "m" : "f";
+  let gender;
+  if (g.size === 1) gender = g.has("m") ? "m" : "f";
+  else gender = Store.get().profile.gender === "男性" ? "m" : "f";
   return `assets/real/model-${gender}.png`;
 }
 

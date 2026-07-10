@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>创建我的模特 · AI穿搭助手</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <style>
   .seg { display: flex; justify-content: center; gap: 40px; padding: 8px 0 2px; }
@@ -205,10 +204,6 @@
 <script src="js/ai.js"></script>
 <script>
   renderStatusbar();
-
-  /* bfcache 恢复时刷新：避免 leaving 锁和「正在返回…」按钮残留导致两个 tab 的确认全部失效，
-     同时避免 Store 内存缓存停留在离开时的旧快照 */
-  window.addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
 
   /* tab 切换 */
   $$(".seg button").forEach(b => b.addEventListener("click", () => {

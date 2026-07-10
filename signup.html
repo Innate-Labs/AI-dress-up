@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>邮箱注册 · AI穿搭助手</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <style>
   .form { padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -48,9 +47,6 @@
 <script src="js/app.js"></script>
 <script>
   renderStatusbar();
-
-  /* iOS 手势返回经 bfcache 恢复时刷新，避免按钮残留“注册中…”态 */
-  window.addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
 
   const inputs = ["#email", "#code", "#pwd"].map(s => $(s));
   function check() {

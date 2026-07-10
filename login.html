@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>登录 · AI穿搭助手</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/base.css">
 <style>
   .login-body { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 0 32px; }
@@ -85,9 +83,6 @@
 <script src="js/app.js"></script>
 <script>
   renderStatusbar();
-
-  /* iOS 手势返回经 bfcache 恢复时刷新，避免按钮残留“登录中…”态 */
-  window.addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
 
   function agreeOk() {
     if (!$("#agreeChk").checked) { toast("请先勾选并同意底部协议"); return false; }
