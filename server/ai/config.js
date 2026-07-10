@@ -26,7 +26,7 @@ module.exports = {
     /* 平铺图生成：qwen-image-edit（DashScope 百炼图生图，约15-20秒/张，实测拆分保真好）
        备选 OpenRouter "google/gemini-3.1-flash-image"（更快更便宜，但偶尔不抠图直接返回整图） */
     flatImage: "qwen-image-edit",  // 模型2第2步 平铺图生成（走 DashScope，见 segment.js）
-    tryon: "aitryon-plus",                       // 模型4 试穿（DashScope）
+    tryon: "google/gemini-3.1-flash-image",      // 模型4 试穿：生图模型一步生成（含鞋子），走 OpenRouter
     recommend: "qwen/qwen3.6-flash",             // 模型5 搭配推荐（读标签做选择，快且便宜）
   },
 };

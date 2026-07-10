@@ -125,12 +125,13 @@
     "linear-gradient(150deg,#efe9dc,#e7dfd0)", "linear-gradient(150deg,#f2ded2,#ecd4c6)",
     "linear-gradient(150deg,#dcead9,#cfe3cd)", "linear-gradient(150deg,#eae4da,#e0d9cd)",
   ];
-  if (!Store.get().history.length) {
+  // 演示数据只播种一次（historySeeded 标记），否则用户删空后刷新又会长回来
+  if (!Store.get().history.length && !Store.get().historySeeded) {
     const demo = OUTFITS.slice(0, 6).map((o, i) => ({
       id: "h" + i, outfitId: o.id, items: o.items, scene: o.scene,
       time: Date.now() - i * 86400000 * 2,
     }));
-    Store.set({ history: demo });
+    Store.set({ history: demo, historySeeded: true });
   }
 
   let editing = false;
@@ -172,9 +173,23 @@
     $("#viewer").classList.add("show");
   }
   function closeViewer() { $("#viewer").classList.remove("show"); }
+  /* 打开时整建一次缩略图条；之后切换只换主图+挪选中框，不全量重建（真机不卡） */
   function renderViewer() {
     const l = list();
-    const cur = l[vIndex];
+    $("#vStrip").innerHTML = l.map((h, i) => `
+      <div class="vthumb" data-v="${i}">
+        ${h.image
+          ? `<img src="${h.image}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
+          : `<div class="bg" style="background:${tintOf(i)}"></div><img src="assets/ph/model.svg">`}
+      </div>`).join("");
+    $$("[data-v]").forEach(t => t.addEventListener("click", () => {
+      vIndex = +t.dataset.v;
+      updateViewer();
+    }));
+    updateViewer();
+  }
+  function updateViewer() {
+    const cur = list()[vIndex];
     if (cur && cur.image) {
       $("#vPhoto").style.background = "#1a1a1c";
       $("#vPhoto").innerHTML = `<img src="${cur.image}" style="max-width:100%;max-height:100%;border-radius:20px;object-fit:contain">`;
@@ -182,16 +197,7 @@
       $("#vPhoto").style.background = tintOf(vIndex);
       $("#vPhoto").innerHTML = `<img src="assets/ph/model.svg">`;
     }
-    $("#vStrip").innerHTML = l.map((h, i) => `
-      <div class="vthumb ${i === vIndex ? "on" : ""}" data-v="${i}">
-        ${h.image
-          ? `<img src="${h.image}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`
-          : `<div class="bg" style="background:${tintOf(i)}"></div><img src="assets/ph/model.svg">`}
-      </div>`).join("");
-    $$("[data-v]").forEach(t => t.addEventListener("click", () => {
-      vIndex = +t.dataset.v;
-      renderViewer();
-    }));
+    $$("#vStrip .vthumb").forEach((t, i) => t.classList.toggle("on", i === vIndex));
     $$("#vStrip .vthumb")[vIndex]?.scrollIntoView({ inline: "center", behavior: "smooth" });
   }
 
@@ -207,7 +213,8 @@
   });
   $("#btnDel").addEventListener("click", () => {
     if (!sel.size) { toast("先选择要删除的记录"); return; }
-    Store.set({ history: list().filter(h => !sel.has(h.id)) });
+    // 删除时顺带置 historySeeded，兼容老数据没有该标记的情况，保证删空后不再自动播种
+    Store.set({ history: list().filter(h => !sel.has(h.id)), historySeeded: true });
     toast(`已删除 ${sel.size} 条记录`);
     sel.clear();
     $("#btnDel").textContent = "删除所选（0）";
