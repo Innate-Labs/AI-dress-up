@@ -5,8 +5,8 @@
 ## 项目定位（最重要）
 
 这是一个**能跑起来的移动端网页产品**：功能真实可用，AI 能力已接真实模型
-（质检 qwen3.6-flash / 识别标签 qwen3-vl / 平铺图 gemini-3.1-flash-image 经 OpenRouter；
-试穿 aitryon-plus 经阿里云百炼；搭配推荐 qwen3.6-flash 读标签选搭配、规则兜底）。
+（质检 qwen3.6-flash / 识别标签 qwen3-vl 经 OpenRouter；平铺图 qwen-image-edit 经阿里云百炼 DashScope；
+试穿 gemini-3.1-flash-image 经 OpenRouter 一步生成整图（含鞋子）；搭配推荐 qwen3.6-flash 读标签选搭配、规则兜底）。
 密钥在 server/.env（不进 git）；换模型只改 server/ai/config.js 的 MODELS；提示词在 server/ai/prompts.js。
 
 - ✅ 做：页面 UI、真实交互、轻量后端 AI 接口层（占位实现，接口契约固定）
@@ -30,7 +30,7 @@
 - 试穿页：换装先秒级叠图预览（CSS 类 `.worn.cat-XX`，位置常量 `CAT_POS`），同时**自动调真试穿模型**
   生成整图（`/api/tryon`），出图后替换叠图；系统衣服/默认模特图会先转 dataURL 发给模型
 - 真试穿防烧钱机制（在 tryon.html，勿删）：换装后 600ms 防抖合并连点；同模特+同一身衣服结果内存缓存；
-  过期结果按序号丢弃。模型限制：只支持上装+下装（连体裙算上装），鞋子不参与生成
+  过期结果按序号丢弃。试穿生图模型一步生成整图（含鞋子），前端不再叠鞋
 - 舞台底色自动取模特图边缘颜色（`syncStageBg`），照片与背景无缝，不要写死舞台颜色
 - 每次完整试穿（≥2件）自动生成快照存入试衣间（上限 20 条，连续重复不存；真试穿图压缩后存）
 - 上传图片一律先 `compressImage()` 压缩再存 localStorage，防超限
