@@ -59,20 +59,23 @@ const Store = {
     /* localStorage 约 5MB 且每次整份重写，塞满时 setItem 会抛异常中断当前操作。
        兜底：从最老的试衣间快照开始丢（占空间的主要是图），腾出地方再存；
        全丢完还存不下就提示用户，页面继续用内存数据跑，不再中断流程。
-       （经产品负责人授权添加，刘倩已确认为正式方案 2026-07-08） */
+       （经产品负责人授权添加，刘倩已确认为正式方案 2026-07-08）
+       返回保存结果给关键调用方（入橱/上传）决定后续提示与跳转：
+       true=正常保存  "evicted"=清理旧快照后保存  false=没存下（仅内存） */
     const save = () => localStorage.setItem(this.KEY, JSON.stringify(this._cache));
-    try { save(); }
+    try { save(); return true; }
     catch {
       const orig = this._cache.history || [];
       const h = [...orig];
       while (h.length) {
         h.pop();                            /* history 新的在前，pop 丢的是最老一条 */
         this._cache.history = h;
-        try { save(); toast("存储空间不足，已自动清理最早的试衣记录"); return; }
+        try { save(); toast("存储空间不足，已自动清理最早的试衣记录"); return "evicted"; }
         catch {}
       }
       this._cache.history = orig;           /* 丢光也没存下：内存里的历史别白丢 */
       toast("手机存储空间已满，本次内容未能保存");
+      return false;
     }
   },
 };

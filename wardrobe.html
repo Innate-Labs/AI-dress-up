@@ -162,6 +162,14 @@
 
   renderCats(); renderItems();
 
+  /* 识别进行中离开页面会静默丢弃这次已付费的识别结果：离开前弹原生确认拦一道
+     （beforeunload 在 iOS Safari 上可能不生效，属尽力而为的兜底） */
+  window.addEventListener("beforeunload", (e) => {
+    if (!scanning) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
   /* 从添加衣服页带回的上传：AI 识别/平铺/打标签，多件自动拆分后入橱 */
   const pending = Store.get().pendingUpload;
   if (pending) {
@@ -179,23 +187,30 @@
         } else {
           const r = await AI.segment(pending);
           const list = (r.items && r.items.length) ? r.items : [{ image: r.image || pending, category: "上衣" }];
-          newItems = list.map((d, i) => ({
+          /* 生成的平铺图是全尺寸大图，入橱前必须压缩，防止一次上传撑爆 localStorage */
+          newItems = await Promise.all(list.map(async (d, i) => ({
             id: "c" + Date.now() + "_" + i,
             name: d.name || "我的单品",
             cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
             ph: "tee",
-            dataUrl: d.image || pending,
+            dataUrl: await compressImage(d.image || pending),
             labels: d.labels || null,
-          }));
+          })));
         }
-        Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
+        const saved = Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
+        scanning = false;
+        renderCats(); renderItems();
+        /* 没存下时不报成功，让 Store.set 的存储警告留在屏上 */
+        if (newItems.length && saved !== false) {
+          toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
+        }
+        return;
       } catch (e) {
         console.warn("识别失败", e);
         toast("识别失败，请重新上传");
       }
       scanning = false;
       renderCats(); renderItems();
-      if (newItems.length) toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
     })();
   }
 </script>

@@ -74,7 +74,8 @@
   /* 选图后：压缩存起来，立刻回衣橱页，AI 抠图由衣橱页在后台完成 */
   async function bgAdd(dataUrl) {
     const small = dataUrl ? await compressImage(dataUrl) : "ph";
-    Store.set({ pendingUpload: small });
+    const saved = Store.set({ pendingUpload: small });
+    if (saved === false) return;   /* 存储满没存下：留在本页，Store.set 的警告 toast 可见，跳走会静默丢上传 */
     location.href = "wardrobe.html";
   }
 
@@ -86,6 +87,7 @@
     const reader = new FileReader();
     reader.onload = () => bgAdd(reader.result);
     reader.readAsDataURL(f);
+    e.target.value = "";   /* 重置：bfcache 返回后再选同一张图也能触发 change */
   }
   $("#fileInput").addEventListener("change", onPick);
   $("#camInput").addEventListener("change", onPick);
