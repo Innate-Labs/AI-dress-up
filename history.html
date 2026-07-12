@@ -124,15 +124,6 @@
     "linear-gradient(150deg,#efe9dc,#e7dfd0)", "linear-gradient(150deg,#f2ded2,#ecd4c6)",
     "linear-gradient(150deg,#dcead9,#cfe3cd)", "linear-gradient(150deg,#eae4da,#e0d9cd)",
   ];
-  // 演示数据只播种一次（historySeeded 标记），否则用户删空后刷新又会长回来
-  if (!Store.get().history.length && !Store.get().historySeeded) {
-    const demo = OUTFITS.slice(0, 6).map((o, i) => ({
-      id: "h" + i, outfitId: o.id, items: o.items, scene: o.scene,
-      time: Date.now() - i * 86400000 * 2,
-    }));
-    Store.set({ history: demo, historySeeded: true });
-  }
-
   let editing = false;
   const sel = new Set();
   const tintOf = i => TINTS[i % TINTS.length];
