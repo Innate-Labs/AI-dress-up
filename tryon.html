@@ -94,6 +94,21 @@
     background: rgba(16,16,18,.85); color: #fff;
     font-size: 14px; font-weight: 600; white-space: nowrap;
   }
+  /* 生成进度条（模拟值，与拆图卡同款 AI 渐变） */
+  .gen-loading .gen-bar {
+    width: 190px; height: 5px; border-radius: 3px;
+    background: rgba(16,16,18,.12); overflow: hidden;
+  }
+  .gen-loading .gen-bar i {
+    display: block; height: 100%; width: 0%;
+    border-radius: 3px; background: var(--grad);
+    transition: width .35s linear;
+  }
+  .gen-loading .gen-pct {
+    font-size: 13px; font-weight: 800; color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    margin-top: -6px;   /* 与进度条收紧一点 */
+  }
   @keyframes gspin { to { transform: rotate(360deg); } }
 
   /* 底部抽屉 */
@@ -198,7 +213,12 @@
     </div>
 
     <button class="btn ai-pill ai-match" id="btnAI"><span class="star">✦</span> AI 搭配我的衣服</button>
-    <div class="gen-loading" id="genLoading"><div class="spinner"></div><div class="gen-text">✦ 穿搭生成中，请耐心等待…</div></div>
+    <div class="gen-loading" id="genLoading">
+      <div class="spinner"></div>
+      <div class="gen-text">✦ 穿搭生成中，请耐心等待…</div>
+      <div class="gen-bar"><i id="genBarFill"></i></div>
+      <span class="gen-pct" id="genPct">0%</span>
+    </div>
   </div>
 
   <div class="drawer">
@@ -283,9 +303,36 @@
   }
 
   /* 舞台渲染：有 AI 生成图用生成图，否则模特图 + 衣服按分类叠放 */
-  /* 加载态开关：显示/隐藏"生成中"整页遮罩 */
+  /* 加载态开关：显示/隐藏"生成中"整页遮罩。
+     进度条为模拟值（生图无真实进度）：先快后慢逼近 96%，完成瞬间跳满停一拍再收 */
+  let genPctTimer = null, genPctVal = 0, genHideSeq = 0;
+  function paintGenPct() {
+    $("#genBarFill").style.width = genPctVal + "%";
+    $("#genPct").textContent = Math.round(genPctVal) + "%";
+  }
   function setLoading(on) {
-    $("#genLoading").classList.toggle("show", on);
+    const mask = $("#genLoading");
+    if (on) {
+      genHideSeq++;                      /* 取消未执行的延迟隐藏，防快速连开被误关 */
+      if (!mask.classList.contains("show")) {
+        genPctVal = 0;
+        paintGenPct();
+        clearInterval(genPctTimer);
+        genPctTimer = setInterval(() => {
+          genPctVal = Math.min(96, genPctVal + Math.max(0.4, (96 - genPctVal) * 0.03));
+          paintGenPct();
+        }, 350);
+      }
+      mask.classList.add("show");
+      return;
+    }
+    if (mask.classList.contains("show")) {
+      clearInterval(genPctTimer);
+      genPctVal = 100;
+      paintGenPct();
+      const seq = ++genHideSeq;
+      setTimeout(() => { if (seq === genHideSeq) mask.classList.remove("show"); }, 300);
+    }
   }
 
   function renderStage() {
