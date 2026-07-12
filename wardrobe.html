@@ -57,8 +57,9 @@
 
   .empty { text-align: center; color: var(--muted); padding: 70px 40px; font-size: 15px; line-height: 2; }
 
-  /* AI 识别中占位卡（上传后顶在网格最前，识别完成原地换成新单品） */
-  .icard.scan { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 212px; cursor: default; }
+  /* AI 识别中占位卡（上传后顶在网格最前）：识别阶段一张转圈卡，
+     识别完成后按件数变成 N 张进度卡（.split-prog 样式在 base.css），逐件点亮入橱 */
+  .icard.scan { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 212px; cursor: default; }
   .scan-ring { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--fill); border-top-color: var(--ink); animation: spin .9s linear infinite; }
   .icard.scan .ai-pill { padding: 8px 14px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
   @keyframes spin { to { transform: rotate(1turn); } }
@@ -95,7 +96,8 @@
   renderTabbar("wardrobe");
 
   let cat = "全部";
-  let scanning = false;   /* 上传后 AI 识别中：网格最前显示占位卡 */
+  let scanning = false;   /* 识别阶段：网格最前显示一张转圈占位卡 */
+  let splits = [];        /* 拆图进度卡：[{target, pct, status: run|fail|done, stop}] */
   function renderCats() {
     const items = wardrobeItems();
     $("#catbar").innerHTML = CATS.map(c => {
@@ -122,7 +124,20 @@
         <div class="scan-ring"></div>
         <span class="ai-pill">AI 识别整理中…</span>
       </div>` : "";
-    $("#itemGrid").innerHTML = (list.length || scanning) ? scanCard + list.map(it => `
+    /* 拆图进度卡：每件一张，显示模拟进度；失败卡给重试 */
+    const splitCards = splits.map((sp, i) => sp.status === "done" ? "" : `
+      <div class="icard scan">
+        <div class="split-prog">
+          <span class="spname">${sp.target.description || sp.target.category || "衣服"}</span>
+          ${sp.status === "fail"
+            ? `<span class="spfail">生成失败</span><button class="spretry" data-retry="${i}">重试</button>`
+            : `<span class="sppct" id="sppct${i}">${sp.pct}%</span>
+               <div class="spbar"><i id="spbar${i}" style="width:${sp.pct}%"></i></div>
+               <span class="ai-pill" style="padding:5px 12px;font-size:11.5px;color:var(--ink-2)">AI 生成中</span>`}
+        </div>
+      </div>`).join("");
+    const busy = scanning || splits.some(sp => sp.status !== "done");
+    $("#itemGrid").innerHTML = (list.length || busy) ? scanCard + splitCards + list.map(it => `
       <div class="icard" data-go="${it.id}">
         <button class="del" data-del="${it.id}">🗑</button>
         <div class="imgwrap">${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}</div>
@@ -132,6 +147,7 @@
     /* 点整卡或「去搭配」→ 带着这件衣服去 AI 搭配试穿 */
     $$("[data-go]").forEach(c => c.addEventListener("click", () =>
       location.href = `tryon.html?item=${c.dataset.go}`));
+    $$("[data-retry]").forEach(b => b.addEventListener("click", () => retrySplit(+b.dataset.retry)));
     $$("[data-del]").forEach(b => b.addEventListener("click", e => {
       e.stopPropagation();
       delTarget = b.dataset.del;
@@ -161,56 +177,126 @@
 
   renderCats(); renderItems();
 
-  /* 识别进行中离开页面会静默丢弃这次已付费的识别结果：离开前弹原生确认拦一道
+  /* 识别/生成进行中离开页面会静默丢弃这次已付费的调用：离开前弹原生确认拦一道
      （beforeunload 在 iOS Safari 上可能不生效，属尽力而为的兜底） */
   window.addEventListener("beforeunload", (e) => {
-    if (!scanning) return;
+    if (!scanning && !splits.some(sp => sp.status === "run")) return;
     e.preventDefault();
     e.returnValue = "";
   });
 
-  /* 从添加衣服页带回的上传：AI 识别/平铺/打标签，多件自动拆分后入橱 */
+  /* ---------- 拆图卡片进度流 ----------
+     识别（快）→ 按件数铺进度卡 → 逐件生成（AI.splitUpload 限并发2）→
+     哪件先完成哪张卡先入橱点亮；失败卡留在原地可重试。
+     进度为模拟值（fakeProgress 逼近96%），真实完成时跳100。 */
+  let splitPhoto = null;   /* 本次拆图的原照片（单件重试用） */
+
+  function setPct(i, p) {
+    const sp = splits[i];
+    if (!sp || sp.status !== "run") return;
+    sp.pct = Math.max(sp.pct, p);
+    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
+    if (pctEl) pctEl.textContent = sp.pct + "%";
+    if (barEl) barEl.style.width = sp.pct + "%";
+  }
+
+  async function finishOne(i, d) {
+    const sp = splits[i];
+    sp.stop?.();
+    /* 完成瞬间跳 100%，停留一拍再点亮入橱 */
+    sp.pct = 100;
+    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
+    if (pctEl) pctEl.textContent = "100%";
+    if (barEl) barEl.style.width = "100%";
+    await new Promise(r => setTimeout(r, 380));
+
+    const item = {
+      id: "c" + Date.now() + "_" + i,
+      name: d.name || "我的单品",
+      cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
+      ph: "tee",
+      /* 生成图入橱前：裁白边+方形规整+压缩，修复高瘦画布在方形卡片里显得极小 */
+      dataUrl: await trimToSquare(d.image || splitPhoto),
+      labels: d.labels || null,
+    };
+    const saved = Store.set({ customItems: [item, ...Store.get().customItems] });   /* 新完成排最前 */
+    sp.status = "done";
+    renderCats(); renderItems();
+    if (saved !== false) toast(`「${item.name}」已入橱`);
+    /* 全部尘埃落定后的汇总提示 */
+    if (!splits.some(x => x.status === "run")) {
+      const ok = splits.filter(x => x.status === "done").length;
+      const fail = splits.filter(x => x.status === "fail").length;
+      if (ok > 1 || fail) toast(fail ? `${ok} 件已入橱，${fail} 件失败可点卡片重试` : `AI 拆分出 ${ok} 件，已全部入橱`);
+    }
+  }
+
+  function failOne(i) {
+    const sp = splits[i];
+    sp.stop?.();
+    sp.status = "fail";
+    renderItems();
+  }
+
+  async function retrySplit(i) {
+    const sp = splits[i];
+    if (!sp || sp.status !== "fail" || !splitPhoto) return;
+    sp.status = "run"; sp.pct = 0;
+    renderItems();
+    sp.stop = fakeProgress(p => setPct(i, p));
+    try {
+      const r = await AI.segmentOne(splitPhoto, sp.target);
+      finishOne(i, r.item);
+    } catch (e) {
+      console.warn("重试仍失败", e);
+      failOne(i);
+    }
+  }
+
+  async function runSplit(photo) {
+    splitPhoto = photo;
+    scanning = true;
+    renderItems();
+    toast("上传成功，AI 正在识别衣服…");
+    try {
+      await AI.splitUpload(photo, {
+        onDetected(targets) {
+          scanning = false;
+          splits = targets.map(target => ({ target, pct: 0, status: "run", stop: null }));
+          renderItems();
+          splits.forEach((sp, i) => { sp.stop = fakeProgress(p => setPct(i, p)); });
+          if (targets.length > 1) toast(`识别到 ${targets.length} 件衣服，AI 处理中…`);
+        },
+        onItemDone: (i, item) => finishOne(i, item),
+        onItemFail: (i, e) => { console.warn("单件生成失败", e); failOne(i); },
+      });
+    } catch (e) {
+      /* 识别这步就挂了：整次失败 */
+      console.warn("识别失败", e);
+      scanning = false;
+      renderItems();
+      toast("识别失败，请重新上传");
+    }
+  }
+
+  /* 从添加衣服页带回的上传 */
   const pending = Store.get().pendingUpload;
   if (pending) {
     /* 先清掉再识别：识别期间离开页面再回来，不会重复触发付费识别 */
     Store.set({ pendingUpload: null });
-    scanning = true;
-    renderItems();
-    toast("上传成功，AI 正在识别整理…");
-    (async () => {
-      let newItems = [];
-      try {
-        if (pending === "ph") {
-          await new Promise(r => setTimeout(r, 900));   /* 演示路径假延时 */
-          newItems = [{ id: "c" + Date.now(), name: "我的单品", cat: "上衣", ph: "tee", dataUrl: null }];
-        } else {
-          const r = await AI.segment(pending);
-          const list = (r.items && r.items.length) ? r.items : [{ image: r.image || pending, category: "上衣" }];
-          /* 生成图入橱前：裁白边+方形规整+压缩（trimToSquare），修复高瘦画布在方形卡片里显得极小 */
-          newItems = await Promise.all(list.map(async (d, i) => ({
-            id: "c" + Date.now() + "_" + i,
-            name: d.name || "我的单品",
-            cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
-            ph: "tee",
-            dataUrl: await trimToSquare(d.image || pending),
-            labels: d.labels || null,
-          })));
-        }
-        const saved = Store.set({ customItems: [...newItems, ...Store.get().customItems] });   /* 新上传排最前 */
+    if (pending === "ph") {
+      /* 网页提取演示路径：假延时后入一件占位款 */
+      scanning = true;
+      renderItems();
+      setTimeout(() => {
+        Store.set({ customItems: [{ id: "c" + Date.now(), name: "我的单品", cat: "上衣", ph: "tee", dataUrl: null }, ...Store.get().customItems] });
         scanning = false;
         renderCats(); renderItems();
-        /* 没存下时不报成功，让 Store.set 的存储警告留在屏上 */
-        if (newItems.length && saved !== false) {
-          toast(newItems.length > 1 ? `AI 拆分出 ${newItems.length} 件，已全部入橱` : "已添加到衣橱");
-        }
-        return;
-      } catch (e) {
-        console.warn("识别失败", e);
-        toast("识别失败，请重新上传");
-      }
-      scanning = false;
-      renderCats(); renderItems();
-    })();
+        toast("已添加到衣橱");
+      }, 900);
+    } else {
+      runSplit(pending);
+    }
   }
 </script>
 </body>

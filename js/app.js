@@ -245,6 +245,17 @@ function modelShapeCss(m) {
   }[m && m.shape] || "";
 }
 
+/* 模拟进度：生图 API 是黑盒调用没有真实百分比，按平均耗时先快后慢逼近 96%，
+   真实完成时由页面直接置 100。返回停止函数。estimateMs=单件平均耗时 */
+function fakeProgress(onPct, estimateMs = 22000) {
+  const t0 = Date.now();
+  const timer = setInterval(() => {
+    const t = (Date.now() - t0) / estimateMs;
+    onPct(Math.min(96, Math.round(100 * (1 - Math.exp(-2.2 * t)))));
+  }, 300);
+  return () => clearInterval(timer);
+}
+
 /* 压缩图片：限制最大边长并转 JPEG，防止 localStorage 超限 */
 function compressImage(dataUrl, maxW = 800, quality = 0.8) {
   return new Promise(resolve => {

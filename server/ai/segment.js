@@ -17,6 +17,11 @@
    2. 逐件生成白底平铺图（qwen-image-edit · flatImagePrompt，走 DashScope 百炼），失败用原图兜底
    3. 逐件打标签（Qwen3-VL · TAG_PROMPT），细分类映射到四大分类
 
+   除整体 segment 外另拆两个分步导出（前端"卡片进度"用，见 /api/detect、/api/segment-one）：
+   - detect({image})              → { items: [{ category, description }] }   只做第1步，快
+   - segmentOne({image, target})  → { item: { image, category, name, labels } }   对一件做第2+3步
+   前端流程：detect 先铺占位卡片 → 逐件 segmentOne（限并发2防 DashScope 限流）点亮卡片
+
    替换模型：识别/标签改 config.js 的 MODELS.vision；平铺图改 MODELS.flatImage
    （注意平铺图现在走 DashScope，非 OpenRouter；换回 OpenRouter 图像模型需改本文件 qwenImageEdit）
    ============================================================ */
@@ -78,7 +83,71 @@ async function tagOne(image) {
   }
 }
 
-module.exports = async function segment(req) {
+/* 第 1 步单拆：识别图里有哪些单品（快，几秒）。
+   前端拿它先铺占位卡片，再逐件调 segmentOne 点亮 */
+async function detect(req) {
+  if (!req || !req.image) throw new Error("缺少 image 参数");
+  if (!OPENROUTER_API_KEY) return { items: [{ category: "上衣", description: "我的单品" }], mock: true };
+
+  let detected = [];
+  try {
+    const text = await chat(MODELS.vision, imageMessage(DETECT_PROMPT, req.image), { timeoutMs: 60000 });
+    detected = (parseJson(text).items || []).slice(0, 3);   // 最多处理3件，控制耗时与费用
+  } catch (e) {
+    console.warn("穿着识别失败:", e.message);
+  }
+  if (!detected.length) detected = [{ category: "上衣", description: "服装" }];
+  return { items: detected };
+}
+
+/* 第 2+3 步单拆：对一件识别结果生成平铺图 + 打标签（慢，10–30 秒）。
+   target = detect 返回的一项 { category, description }
+   strict=true（拆图卡片流用）：有密钥但生成失败时直接抛错 →
+   前端显示失败卡可重试，不再把原图当成品入橱（拆多件时兜底原图会一图三卡全重复）。
+   没配密钥仍走原图兜底 = 纯演示模式。 */
+async function segmentOne(req) {
+  if (!req || !req.image) throw new Error("缺少 image 参数");
+  const d = req.target || { category: "上衣", description: "服装" };
+
+  if (!OPENROUTER_API_KEY) {
+    return { item: { image: req.image, category: "上衣", name: d.description || "我的单品" }, mock: true };
+  }
+
+  let flat = null;
+  if (DASHSCOPE_API_KEY) {
+    try {
+      flat = await qwenImageEdit(flatImagePrompt(d.category), req.image);
+    } catch (e) {
+      console.warn(`平铺图生成失败（${d.category}）:`, e.message);
+      if (req.strict) throw new Error(`平铺图生成失败：${e.message}`);
+    }
+  }
+  const img = flat || req.image;
+
+  let labels = null;
+  try {
+    const raw = await tagOne(img);
+    labels = {
+      "类别": raw["类别"] || "不确定",
+      "颜色": raw["颜色"] || "不确定",
+      "适用场景": mapScene(raw["适用场景"]),
+      "风格": raw["风格"] || "不确定",
+      "置信度": raw["置信度"] || "低",
+    };
+  } catch (e) {
+    console.warn("打标签最终失败:", e.message);
+  }
+
+  const cat = (labels && CAT_MAP[labels["类别"]]) || CAT_MAP[d.category] || d.category || "上衣";
+  const name = labels && labels["颜色"] !== "不确定" && labels["类别"] !== "不确定"
+    ? `${labels["颜色"]}${labels["类别"]}`
+    : (d.description || "我的单品");
+
+  return { item: { image: img, category: ["上衣","下装","鞋子","连体裙"].includes(cat) ? cat : "上衣", name, labels } };
+}
+
+/* 旧契约保留：一次调用完成 识别→逐件平铺→标签（内部并行3件） */
+async function segment(req) {
   if (!req || !req.image) throw new Error("缺少 image 参数");
 
   /* 没配密钥 → 占位行为：原图直接返回 */
@@ -86,49 +155,12 @@ module.exports = async function segment(req) {
     return { image: req.image, items: [{ image: req.image, category: "上衣", name: "我的单品" }], mock: true };
   }
 
-  /* 1. 识别有哪些单品 */
-  let detected = [];
-  try {
-    const text = await chat(MODELS.vision, imageMessage(DETECT_PROMPT, req.image), { timeoutMs: 60000 });
-    detected = (parseJson(text).items || []).slice(0, 3);   // 最多处理3件，控制耗时
-  } catch (e) {
-    console.warn("穿着识别失败:", e.message);
-  }
-  if (!detected.length) detected = [{ category: "上衣", description: "服装" }];
-
-  /* 2+3. 逐件：平铺图 + 标签（并行处理省时间） */
-  const items = await Promise.all(detected.map(async (d) => {
-    let flat = null;
-    if (DASHSCOPE_API_KEY) {
-      try {
-        flat = await qwenImageEdit(flatImagePrompt(d.category), req.image);
-      } catch (e) {
-        console.warn(`平铺图生成失败（${d.category}），用原图兜底:`, e.message);
-      }
-    }
-    const img = flat || req.image;
-
-    let labels = null;
-    try {
-      const raw = await tagOne(img);
-      labels = {
-        "类别": raw["类别"] || "不确定",
-        "颜色": raw["颜色"] || "不确定",
-        "适用场景": mapScene(raw["适用场景"]),
-        "风格": raw["风格"] || "不确定",
-        "置信度": raw["置信度"] || "低",
-      };
-    } catch (e) {
-      console.warn("打标签最终失败:", e.message);
-    }
-
-    const cat = (labels && CAT_MAP[labels["类别"]]) || CAT_MAP[d.category] || d.category || "上衣";
-    const name = labels && labels["颜色"] !== "不确定" && labels["类别"] !== "不确定"
-      ? `${labels["颜色"]}${labels["类别"]}`
-      : (d.description || "我的单品");
-
-    return { image: img, category: ["上衣","下装","鞋子","连体裙"].includes(cat) ? cat : "上衣", name, labels };
-  }));
-
+  const detected = (await detect(req)).items;
+  const items = (await Promise.all(detected.map(d => segmentOne({ image: req.image, target: d }))))
+    .map(r => r.item);
   return { image: items[0].image, items };
-};
+}
+
+module.exports = segment;
+module.exports.detect = detect;
+module.exports.segmentOne = segmentOne;

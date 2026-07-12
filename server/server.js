@@ -48,6 +48,22 @@ app.post("/api/segment", async (req, res) => {
   }
 });
 
+/* 拆图分步版（前端卡片进度用）：先识别出清单，再逐件生成 */
+app.post("/api/detect", async (req, res) => {
+  try {
+    res.json(await segment.detect(req.body));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+app.post("/api/segment-one", async (req, res) => {
+  try {
+    res.json(await segment.segmentOne(req.body));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 /* 试穿：模特照片 + 衣服列表 → 返回上身效果 */
 app.post("/api/tryon", async (req, res) => {
   try {

@@ -68,6 +68,53 @@ const AI = {
     return { image, items: [{ image, category: "上衣", name: "我的单品" }], mock: true };
   },
 
+  /* ---------- ①b 拆图分步版（上传卡片进度用） ---------- */
+
+  /* 识别照片里有哪些衣服（快）：{ items: [{category, description}] } */
+  async detect(image) {
+    if (await this.available()) {
+      try {
+        return await this._post("/api/detect", { image }, 90000);
+      } catch (e) { console.warn("detect 请求失败（在线）", e); throw e; }
+    }
+    /* 本地模拟：当一件处理 */
+    return { items: [{ category: "上衣", description: "我的单品" }], mock: true };
+  },
+
+  /* 对识别出的一件生成平铺图+标签（慢）：{ item: {image, category, name, labels} }
+     strict：有密钥但生成失败时后端直接报错 → 页面显示失败卡可重试，不塞原图 */
+  async segmentOne(image, target) {
+    if (await this.available()) {
+      try {
+        return await this._post("/api/segment-one", { image, target, strict: true }, 240000);
+      } catch (e) { console.warn("segment-one 请求失败（在线）", e); throw e; }
+    }
+    /* 本地模拟：假延时后原图返回 */
+    await new Promise(r => setTimeout(r, 1800));
+    return { item: { image, category: target?.category || "上衣", name: target?.description || "我的单品" }, mock: true };
+  },
+
+  /* 拆图上传编排：识别 → 逐件生成（限并发 2，防 DashScope 限流；服务端另有退避重试）。
+     ui 回调：onDetected(targets) / onItemDone(i, item) / onItemFail(i, err)
+     detect 失败直接上抛由页面提示；单件失败只回调 onItemFail，页面给该卡片"重试" */
+  async splitUpload(image, ui) {
+    const targets = (await this.detect(image)).items;
+    ui.onDetected(targets);
+    let next = 0;
+    const worker = async () => {
+      while (next < targets.length) {
+        const i = next++;
+        try {
+          const r = await this.segmentOne(image, targets[i]);
+          ui.onItemDone(i, r.item);
+        } catch (e) {
+          ui.onItemFail(i, e);
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+  },
+
   /* ---------- ② 虚拟试穿 ----------
      返回 { image } —— image 为 null 时由页面用本地叠图合成兜底 */
   async tryon(modelImage, items) {
