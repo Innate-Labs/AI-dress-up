@@ -653,7 +653,8 @@
         console.warn("发起拆分失败", err);
         localScan = false;
         renderMineGrid();
-        toast("上传失败，请重新试一次");
+        /* 401/429 已由 ai.js 统一提示过（err.handled），别再用通用文案覆盖 */
+        if (!err || !err.handled) toast("上传失败，请重新试一次");
       } finally {
         uploading = false;
       }

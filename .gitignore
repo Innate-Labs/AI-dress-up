@@ -3,6 +3,8 @@ node_modules/
 手机访问二维码.png
 server/.env
 server/data/
+.vercel/
+package-lock.json
 
 # 拆图测试的输入图与产出（本地测试用，不入库）
 server/tools/split-test-output*/

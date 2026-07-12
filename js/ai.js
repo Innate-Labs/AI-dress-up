@@ -14,13 +14,28 @@ const AI = {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeout);
     try {
+      /* 生成类接口服务端要求登录：带上登录发的 token */
+      const token = (Store.get().account || {}).token || "";
       const resp = await fetch(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        const err = new Error(data.error || ("HTTP " + resp.status));
+        /* 未登录(401)/额度用完(429)：这里统一 toast 并标记 handled，
+           页面 catch 里请判 e.handled 再决定要不要再报通用失败提示（防覆盖） */
+        if (resp.status === 401 || resp.status === 429) {
+          toast(data.error || "请先登录后使用 AI 功能");
+          err.handled = true;
+        }
+        throw err;
+      }
       return await resp.json();
     } finally {
       clearTimeout(timer);

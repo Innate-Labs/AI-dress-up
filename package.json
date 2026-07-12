@@ -1,0 +1,9 @@
+{
+  "name": "meida",
+  "private": true,
+  "description": "美搭 · Vercel 部署根依赖（本地开发仍在 server/ 目录 npm start）",
+  "dependencies": {
+    "express": "^4.21.0",
+    "@vercel/functions": "^2.0.0"
+  }
+}
