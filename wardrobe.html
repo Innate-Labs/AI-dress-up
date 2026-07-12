@@ -110,11 +110,7 @@
   renderTabbar("wardrobe");
 
   let cat = "全部";
-  let scanning = false;   /* 识别阶段：网格最前显示一张转圈占位卡 */
-  let splits = [];        /* 拆图进度卡：[{target, pct, status: run|fail|done, stop}] */
-  let localScan = false;  /* 离线/演示路径的即时识别态 */
-  /* 识别中占位卡：本地识别阶段 或 有后台拆分任务（跨页面持续）时显示 */
-  const isScanning = () => scanning || localScan || (Store.get().pendingSegments || []).length > 0;
+  let localScan = false;  /* 离线/演示路径的即时识别态（后台任务的进度卡由 segCardList 提供） */
 
   /* 单品图放大预览 */
   function openPreview(src) {
@@ -145,25 +141,18 @@
 
   function renderItems() {
     const list = wardrobeItems().filter(i => cat === "全部" || i.cat === cat);
-    const scanCard = isScanning() ? `
+    /* 离线/演示路径的即时识别占位卡 */
+    const localCard = localScan ? `
       <div class="icard scan">
         <div class="scan-ring"></div>
         <span class="ai-pill">AI 识别整理中…</span>
       </div>` : "";
-    /* 拆图进度卡：每件一张，显示模拟进度；失败卡给重试 */
-    const splitCards = splits.map((sp, i) => sp.status === "done" ? "" : `
-      <div class="icard scan">
-        <div class="split-prog">
-          <span class="spname">${sp.target.description || sp.target.category || "衣服"}</span>
-          ${sp.status === "fail"
-            ? `<span class="spfail">生成失败</span><button class="spretry" data-retry="${i}">重试</button>`
-            : `<span class="sppct" id="sppct${i}">${sp.pct}%</span>
-               <div class="spbar"><i id="spbar${i}" style="width:${sp.pct}%"></i></div>
-               <span class="ai-pill" style="padding:5px 12px;font-size:11.5px;color:var(--ink-2)">AI 生成中</span>`}
-        </div>
-      </div>`).join("");
-    const busy = isScanning() || splits.some(sp => sp.status !== "done");
-    $("#itemGrid").innerHTML = (list.length || busy) ? scanCard + splitCards + list.map(it => `
+    /* 后台拆分任务进度卡：识别中一张、识别后每件一张，跨页面由轮询快照驱动
+       （segCardList / segCardInner 在 js/app.js，试穿抽屉同款） */
+    const segCards = segCardList();
+    const splitCards = segCards.map(c => `<div class="icard scan">${segCardInner(c)}</div>`).join("");
+    const busy = localScan || segCards.length > 0;
+    $("#itemGrid").innerHTML = (list.length || busy) ? localCard + splitCards + list.map(it => `
       <div class="icard">
         <button class="del" data-del="${it.id}">🗑</button>
         <div class="imgwrap" data-view>${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}</div>
@@ -177,7 +166,7 @@
       const src = w.querySelector("img")?.src;
       if (src) openPreview(src);
     }));
-    $$("[data-retry]").forEach(b => b.addEventListener("click", () => retrySplit(+b.dataset.retry)));
+    bindSegRetry();
     $$("[data-del]").forEach(b => b.addEventListener("click", e => {
       e.stopPropagation();
       delTarget = b.dataset.del;
@@ -207,115 +196,44 @@
 
   renderCats(); renderItems();
 
-  /* 识别/生成进行中离开页面会静默丢弃这次已付费的调用：离开前弹原生确认拦一道
-     （beforeunload 在 iOS Safari 上可能不生效，属尽力而为的兜底） */
-  window.addEventListener("beforeunload", (e) => {
-    if (!scanning && !splits.some(sp => sp.status === "run")) return;
-    e.preventDefault();
-    e.returnValue = "";
-  });
-
-  /* ---------- 拆图卡片进度流 ----------
-     识别（快）→ 按件数铺进度卡 → 逐件生成（AI.splitUpload 限并发2）→
-     哪件先完成哪张卡先入橱点亮；失败卡留在原地可重试。
-     进度为模拟值（fakeProgress 逼近96%），真实完成时跳100。 */
-  let splitPhoto = null;   /* 本次拆图的原照片（单件重试用） */
-
-  function setPct(i, p) {
-    const sp = splits[i];
-    if (!sp || sp.status !== "run") return;
-    sp.pct = Math.max(sp.pct, p);
-    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
-    if (pctEl) pctEl.textContent = sp.pct + "%";
-    if (barEl) barEl.style.width = sp.pct + "%";
-  }
-
-  async function finishOne(i, d) {
-    const sp = splits[i];
-    sp.stop?.();
-    /* 完成瞬间跳 100%，停留一拍再点亮入橱 */
-    sp.pct = 100;
-    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
-    if (pctEl) pctEl.textContent = "100%";
-    if (barEl) barEl.style.width = "100%";
-    await new Promise(r => setTimeout(r, 380));
-
-    const item = {
-      id: "c" + Date.now() + "_" + i,
-      name: d.name || "我的单品",
-      cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
-      ph: "tee",
-      /* 生成图入橱前：裁白边+方形规整+压缩，修复高瘦画布在方形卡片里显得极小 */
-      dataUrl: await trimToSquare(d.image || splitPhoto),
-      labels: d.labels || null,
-    };
-    const saved = Store.set({ customItems: [item, ...Store.get().customItems] });   /* 新完成排最前 */
-    sp.status = "done";
-    renderCats(); renderItems();
-    if (saved !== false) toast(`「${item.name}」已入橱`);
-    /* 全部尘埃落定后的汇总提示 */
-    if (!splits.some(x => x.status === "run")) {
-      const ok = splits.filter(x => x.status === "done").length;
-      const fail = splits.filter(x => x.status === "fail").length;
-      if (ok > 1 || fail) toast(fail ? `${ok} 件已入橱，${fail} 件失败可点卡片重试` : `AI 拆分出 ${ok} 件，已全部入橱`);
-    }
-  }
-
-  function failOne(i) {
-    const sp = splits[i];
-    sp.stop?.();
-    sp.status = "fail";
-    renderItems();
-  }
-
-  async function retrySplit(i) {
-    const sp = splits[i];
-    if (!sp || sp.status !== "fail" || !splitPhoto) return;
-    sp.status = "run"; sp.pct = 0;
-    renderItems();
-    sp.stop = fakeProgress(p => setPct(i, p));
+  /* ---------- 拆图上传（后台任务 + 逐件进度卡） ----------
+     提交即返回 jobId（识别与逐件生成都在服务器跑，用户可离开本页）；
+     进度卡由 app.js 全局轮询的快照驱动，哪件先生成好哪件先入橱点亮，
+     失败卡可单件重试。离线时走本地模拟即时入橱。 */
+  async function startSplitJob(photo) {
     try {
-      const r = await AI.segmentOne(splitPhoto, sp.target);
-      finishOne(i, r.item);
+      const r = await AI.segmentStart(photo);
+      if (r.jobId) {
+        Store.set({ pendingSegments: [...(Store.get().pendingSegments || []), { jobId: r.jobId, ts: Date.now(), landed: [] }] });
+        renderItems();
+        toast("上传成功，AI 正在整理，可离开本页");
+        pollSegmentJobs();   /* 立即拉一次，尽快出识别结果的进度卡 */
+      } else if (r.local) {
+        /* 离线回退：本地模拟即时入橱 */
+        localScan = true;
+        renderItems();
+        await new Promise(rr => setTimeout(rr, 1200));
+        const items = await buildSegmentItems(r.local);
+        const saved = Store.set({ customItems: [...items, ...Store.get().customItems] });
+        localScan = false;
+        renderCats(); renderItems();
+        if (saved !== false) toast(items.length > 1 ? `AI 拆分出 ${items.length} 件，已入橱` : "已添加到衣橱");
+      }
     } catch (e) {
-      console.warn("重试仍失败", e);
-      failOne(i);
-    }
-  }
-
-  async function runSplit(photo) {
-    splitPhoto = photo;
-    scanning = true;
-    renderItems();
-    toast("上传成功，AI 正在识别衣服…");
-    try {
-      await AI.splitUpload(photo, {
-        onDetected(targets) {
-          scanning = false;
-          splits = targets.map(target => ({ target, pct: 0, status: "run", stop: null }));
-          renderItems();
-          splits.forEach((sp, i) => { sp.stop = fakeProgress(p => setPct(i, p)); });
-          if (targets.length > 1) toast(`识别到 ${targets.length} 件衣服，AI 处理中…`);
-        },
-        onItemDone: (i, item) => finishOne(i, item),
-        onItemFail: (i, e) => { console.warn("单件生成失败", e); failOne(i); },
-      });
-    } catch (e) {
-      /* 识别这步就挂了：整次失败 */
-      console.warn("识别失败", e);
-      scanning = false;
+      console.warn("发起拆分失败", e);
+      localScan = false;
       renderItems();
-      toast("识别失败，请重新上传");
+      toast("上传失败，请重新试一次");
     }
   }
 
-  /* 后台拆分任务在任意页面跑完写入衣橱后：本页在则实时刷新 */
+  /* 后台任务状态推进/完成入橱后：本页在则实时刷新 */
   window.addEventListener("segments-updated", () => { renderCats(); renderItems(); });
 
   /* 从添加衣服页带回的上传 */
   const pending = Store.get().pendingUpload;
   if (pending) {
-    /* 先清掉：识别期间离开本页再回来，不会重复触发 */
+    /* 先清掉：期间离开本页再回来，不会重复触发 */
     Store.set({ pendingUpload: null });
     if (pending === "ph") {
       /* 演示占位路径：本地即时入橱 */
@@ -328,7 +246,7 @@
         toast("已添加到衣橱");
       }, 900);
     } else {
-      runSplit(pending);
+      startSplitJob(pending);
     }
   }
 </script>

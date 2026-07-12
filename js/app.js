@@ -246,16 +246,76 @@ function modelShapeCss(m) {
   }[m && m.shape] || "";
 }
 
-/* 模拟进度：生图 API 是黑盒调用没有真实百分比，按平均耗时先快后慢逼近 96%，
-   真实完成时由页面直接置 100。返回停止函数。estimateMs=单件平均耗时 */
-function fakeProgress(onPct, estimateMs = 22000) {
-  const t0 = Date.now();
-  const timer = setInterval(() => {
-    const t = (Date.now() - t0) / estimateMs;
-    onPct(Math.min(96, Math.round(100 * (1 - Math.exp(-2.2 * t)))));
-  }, 300);
-  return () => clearInterval(timer);
+/* ---------- 拆分进度卡公共件（衣橱网格 / 试穿抽屉共用） ----------
+   进度为模拟值（生图 API 无真实百分比）：排队中爬到 25%，生成中逼近 96%，
+   真实完成由轮询落库、卡片消失。样式 .split-prog 在 base.css。 */
+const _segPcts = {};   // "jobId:index" → 当前模拟百分比
+function segTickPcts(cards) {
+  const alive = new Set();
+  for (const c of cards) {
+    if (c.state !== "pending" && c.state !== "running") continue;
+    const key = c.jobId + ":" + c.index;
+    alive.add(key);
+    const cap = c.state === "running" ? 96 : 25;
+    const cur = _segPcts[key] ?? 4;
+    _segPcts[key] = Math.min(cap, cur + Math.max(0.4, (cap - cur) * 0.035));
+  }
+  for (const k of Object.keys(_segPcts)) if (!alive.has(k)) delete _segPcts[k];
 }
+function segPct(c) { return Math.round(_segPcts[c.jobId + ":" + c.index] ?? 4); }
+
+/* 进度卡内层 HTML（页面负责外层 .icard/.dcell 容器） */
+function segCardInner(c) {
+  if (c.state === "detecting") {
+    return `<div class="split-prog"><span class="spname">AI 识别中…</span>
+      <div class="spbar"><i style="width:30%"></i></div></div>`;
+  }
+  const key = c.jobId + ":" + c.index;
+  if (c.state === "fail") {
+    return `<div class="split-prog"><span class="spname">${c.label}</span>
+      <span class="spfail">生成失败</span>
+      <button class="spretry" data-segretry="${key}">重试</button></div>`;
+  }
+  const p = segPct(c);
+  return `<div class="split-prog"><span class="spname">${c.label}</span>
+    <span class="sppct" data-segpct="${key}">${p}%</span>
+    <div class="spbar"><i data-segbar="${key}" style="width:${p}%"></i></div>
+    <span class="ai-pill" style="padding:5px 12px;font-size:11.5px;color:var(--ink-2)">${c.state === "pending" ? "排队中" : "AI 生成中"}</span></div>`;
+}
+
+/* 页面渲染进度卡后调用：给失败卡的重试按钮绑事件（乐观置回排队，轮询接管后续） */
+function bindSegRetry() {
+  $$("[data-segretry]").forEach(b => b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const [jobId, idx] = b.dataset.segretry.split(":");
+    b.disabled = true;
+    try {
+      await AI.segmentRetry(jobId, +idx);
+      const snap = SEG_SNAPSHOT[jobId];
+      if (snap && snap.targets && snap.targets[+idx]) snap.targets[+idx].state = "pending";
+      window.dispatchEvent(new CustomEvent("segments-updated"));
+    } catch {
+      toast("重试发起失败，请稍后再点");
+      b.disabled = false;
+    }
+  }));
+}
+
+/* 全局定时刷进度数字（无卡片时零开销）；状态推进由 segments-updated 触发页面重渲 */
+setInterval(() => {
+  const cards = typeof segCardList === "function" ? segCardList() : [];
+  if (!cards.length) return;
+  segTickPcts(cards);
+  for (const c of cards) {
+    if (c.state !== "pending" && c.state !== "running") continue;
+    const key = c.jobId + ":" + c.index;
+    const el = document.querySelector(`[data-segpct="${CSS.escape(key)}"]`);
+    const bar = document.querySelector(`[data-segbar="${CSS.escape(key)}"]`);
+    const p = segPct(c);
+    if (el) el.textContent = p + "%";
+    if (bar) bar.style.width = p + "%";
+  }
+}, 400);
 
 /* 压缩图片：限制最大边长并转 JPEG，防止 localStorage 超限 */
 function compressImage(dataUrl, maxW = 800, quality = 0.8) {
@@ -339,6 +399,11 @@ async function buildSegmentItems(result) {
   })));
 }
 
+/* 任务快照（内存，不入 localStorage）：jobId → /api/segment/result 最近一次返回，
+   衣橱/试穿抽屉的进度卡靠它渲染逐件状态 */
+const SEG_SNAPSHOT = {};
+const SEG_JOB_MAX_AGE = 30 * 60 * 1000;   // 与服务端 TTL 对齐：超时任务客户端也放弃
+
 let _segPolling = false;
 async function pollSegmentJobs() {
   if (_segPolling) return;
@@ -346,41 +411,86 @@ async function pollSegmentJobs() {
   if (!pend.length) return;
   _segPolling = true;
   try {
-    const addItems = [], stillPending = [];
+    const addItems = [], keep = [];
     let changed = false;
     for (const job of pend) {
+      if (Date.now() - job.ts > SEG_JOB_MAX_AGE) {
+        changed = true;
+        delete SEG_SNAPSHOT[job.jobId];
+        toast("有一次拆分超时未完成，请重新上传");
+        continue;
+      }
       let r;
       try {
         const resp = await fetch("/api/segment/result", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobId: job.jobId }),
+          body: JSON.stringify({ jobId: job.jobId, got: job.landed || [] }),
         });
-        r = resp.ok ? await resp.json() : { status: "pending" };
-      } catch { r = { status: "pending" }; }   /* 网络闪断：保留任务，下轮再试 */
-      if (r.status === "done") {
-        addItems.push(...await buildSegmentItems(r.result));
+        r = resp.ok ? await resp.json() : null;
+      } catch { r = null; }   /* 网络闪断/后端未起：保留任务，下轮再试 */
+      if (!r) { keep.push(job); continue; }
+
+      if (r.status === "error" || r.status === "missing") {
+        changed = true;   /* 识别失败或服务重启丢失：移除任务并提示 */
+        delete SEG_SNAPSHOT[job.jobId];
+        toast(r.status === "error" ? "有一次拆分识别失败，请重新上传" : "拆分任务已丢失，请重新上传");
+        continue;
+      }
+
+      SEG_SNAPSHOT[job.jobId] = r;
+      /* 逐件落地：哪件先生成好哪件先入橱（landed 记录已取走的件，防重复） */
+      const landed = new Set(job.landed || []);
+      for (let i = 0; i < (r.targets || []).length; i++) {
+        const t = r.targets[i];
+        if (t.state === "done" && t.item && !landed.has(i)) {
+          addItems.push(...await buildSegmentItems({ items: [t.item] }));
+          landed.add(i);
+          changed = true;
+        }
+      }
+      job.landed = [...landed];
+
+      /* 全部完成且无失败 → 任务出队；有失败卡（等重试）或还在跑 → 保留 */
+      if (r.status === "done" && !(r.targets || []).some(t => t.state === "fail")) {
         changed = true;
-      } else if (r.status === "error" || r.status === "missing") {
-        changed = true;   /* 失败或服务重启丢失：移除任务并提示 */
-        toast("有一次拆分未成功，请重新上传");
+        delete SEG_SNAPSHOT[job.jobId];
       } else {
-        stillPending.push(job);
+        keep.push(job);
       }
     }
-    if (changed) {
-      const s = Store.get();
+    if (changed || addItems.length) {
       Store.set({
-        customItems: [...addItems, ...s.customItems],   /* 新入橱排最前 */
-        pendingSegments: stillPending,
+        customItems: [...addItems, ...Store.get().customItems],   /* 新入橱排最前 */
+        pendingSegments: keep,
       });
       if (addItems.length) {
-        toast(addItems.length > 1 ? `AI 拆分出 ${addItems.length} 件，已入橱` : "衣服已入橱");
+        toast(addItems.length > 1 ? `${addItems.length} 件已入橱` : `「${addItems[0].name}」已入橱`);
       }
-      window.dispatchEvent(new CustomEvent("segments-updated"));
     }
+    /* 每轮都通知页面：进度卡需要感知 排队中→生成中 等状态推进 */
+    window.dispatchEvent(new CustomEvent("segments-updated"));
   } finally {
     _segPolling = false;
   }
+}
+
+/* 供页面渲染进度卡：把待处理任务摊平成卡片清单
+   [{jobId, index, state: detecting|pending|running|fail, label}] */
+function segCardList() {
+  const out = [];
+  for (const job of (Store.get().pendingSegments || [])) {
+    const snap = SEG_SNAPSHOT[job.jobId];
+    if (!snap || snap.status === "detecting") {
+      out.push({ jobId: job.jobId, index: -1, state: "detecting", label: "" });
+      continue;
+    }
+    const landed = new Set(job.landed || []);
+    (snap.targets || []).forEach((t, i) => {
+      if (t.state === "done" || landed.has(i)) return;   /* 已入橱的不再出卡 */
+      out.push({ jobId: job.jobId, index: i, state: t.state, label: t.description || t.category || "衣服" });
+    });
+  }
+  return out;
 }
 /* 每页加载即查一次，之后每 3s 查一次（仅在有待处理任务时真正请求） */
 pollSegmentJobs();

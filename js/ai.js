@@ -68,61 +68,20 @@ const AI = {
     return { image, items: [{ image, category: "上衣", name: "我的单品" }], mock: true };
   },
 
-  /* ---------- ①b 拆图分步版（单件重试/离线兜底用） ---------- */
-
-  /* 识别照片里有哪些衣服（快）：{ items: [{category, description}] } */
-  async detect(image) {
-    if (await this.available()) {
-      try {
-        return await this._post("/api/detect", { image }, 90000);
-      } catch (e) { console.warn("detect 请求失败（在线）", e); throw e; }
-    }
-    /* 本地模拟：当一件处理 */
-    return { items: [{ category: "上衣", description: "我的单品" }], mock: true };
-  },
-
-  /* 对识别出的一件生成平铺图+标签（慢）：{ item: {image, category, name, labels} }
-     strict：有密钥但生成失败时后端直接报错 → 页面显示失败卡可重试，不塞原图 */
-  async segmentOne(image, target) {
-    if (await this.available()) {
-      try {
-        return await this._post("/api/segment-one", { image, target, strict: true }, 240000);
-      } catch (e) { console.warn("segment-one 请求失败（在线）", e); throw e; }
-    }
-    /* 本地模拟：假延时后原图返回 */
-    await new Promise(r => setTimeout(r, 1800));
-    return { item: { image, category: target?.category || "上衣", name: target?.description || "我的单品" }, mock: true };
-  },
-
-  /* 拆图上传编排：识别 → 逐件生成（限并发 2，防 DashScope 限流；服务端另有退避重试）。
-     ui 回调：onDetected(targets) / onItemDone(i, item) / onItemFail(i, err)
-     detect 失败直接上抛由页面提示；单件失败只回调 onItemFail，页面给该卡片"重试" */
-  async splitUpload(image, ui) {
-    const targets = (await this.detect(image)).items;
-    ui.onDetected(targets);
-    let next = 0;
-    const worker = async () => {
-      while (next < targets.length) {
-        const i = next++;
-        try {
-          const r = await this.segmentOne(image, targets[i]);
-          ui.onItemDone(i, r.item);
-        } catch (e) {
-          ui.onItemFail(i, e);
-        }
-      }
-    };
-    await Promise.all([worker(), worker()]);
-  },
-
-  /* ---------- ①c 拆分（后台化）：提交任务 ----------
-     在线 → { jobId }：拆分在服务器继续跑，前端轮询 /api/segment/result 取回；
+  /* ---------- ①b 拆分（后台化 · 逐件粒度）：提交任务 ----------
+     在线 → { jobId }：识别与逐件生成都在服务器跑（并发上限2），
+       app.js 的全局轮询取回逐件状态驱动进度卡、完成落库，用户可离开页面；
      离线 → { local }：无后台队列，返回本地模拟结果，调用方即时入橱 */
   async segmentStart(image) {
     if (await this.available()) {
       return await this._post("/api/segment/start", { image }, 30000);
     }
     return { local: { image, items: [{ image, category: "上衣", name: "我的单品" }], mock: true } };
+  },
+
+  /* 拆分单件重试：把任务里 fail 的一件重新排队，进度由轮询接管 */
+  async segmentRetry(jobId, index) {
+    return await this._post("/api/segment/retry", { jobId, index }, 15000);
   },
 
   /* ---------- ② 虚拟试穿 ----------

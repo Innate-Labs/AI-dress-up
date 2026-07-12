@@ -321,7 +321,7 @@ body {
   font-size: 12px; font-weight: 700; color: var(--ink-2);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.split-prog .sppct { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.split-prog .sppct { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }   /* 固定墨色：试穿抽屉深色主题下不被继承成白色 */
 .split-prog .spbar { width: 78%; height: 4px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }
 .split-prog .spbar i {
   display: block; height: 100%; width: 0%;

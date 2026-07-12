@@ -550,104 +550,31 @@
   }
   function renderMineGrid() {
     const list = wardrobeItems().filter(i => cFilter === "全部" || i.cat === cFilter);
-    /* 拆图进度卡：识别阶段一张"识别中"，识别后每件一张模拟进度，失败可重试 */
-    const detectCard = detecting
+    /* 后台拆分任务进度卡：跨页面由轮询快照驱动（segCardList/segCardInner 在 app.js，衣橱页同款） */
+    const localCard = localScan
       ? `<div class="dcell scan"><div class="split-prog"><span class="spname">AI 识别中…</span><div class="spbar"><i style="width:30%"></i></div></div></div>`
       : "";
-    const splitCards = splits.map((sp, i) => sp.status === "done" ? "" : `
-      <div class="dcell scan">
-        <div class="split-prog">
-          <span class="spname">${sp.target.description || sp.target.category || "衣服"}</span>
-          ${sp.status === "fail"
-            ? `<span class="spfail">失败</span><button class="spretry" data-retry="${i}">重试</button>`
-            : `<span class="sppct" id="sppct${i}">${sp.pct}%</span>
-               <div class="spbar"><i id="spbar${i}" style="width:${sp.pct}%"></i></div>`}
-        </div>
-      </div>`).join("");
+    const splitCards = segCardList().map(c => `<div class="dcell scan">${segCardInner(c)}</div>`).join("");
     $("#mineGrid").innerHTML =
-      `<div class="dcell add" data-add>＋</div>` + detectCard + splitCards +
+      `<div class="dcell add" data-add>＋</div>` + localCard + splitCards +
       list.map(it => `
         <div class="dcell ${wearing.includes(it.id) ? "on" : ""}" data-i="${it.id}">
           ${it.dataUrl ? `<img src="${it.dataUrl}">` : itemImg(it)}
         </div>`).join("");
     $$("[data-i]").forEach(c => c.addEventListener("click", () => wearItem(c.dataset.i)));
-    $$("[data-retry]").forEach(b => b.addEventListener("click", e => {
-      e.stopPropagation();
-      retrySplit(+b.dataset.retry);
-    }));
+    bindSegRetry();
     bindAdd();
   }
 
-  /* + 号：打开系统相册选图 → 识别铺卡片 → 逐件生成点亮入橱（与衣橱页同一套流程） */
-  let uploading = false;   /* 一批处理中锁住 + 号，连点不再重复调用付费模型 */
-  let detecting = false;
-  let splits = [];         /* [{target, pct, status: run|fail|done, stop}] */
-  let splitPhoto = null;   /* 本次拆图原照片（单件重试用） */
+  /* + 号：打开系统相册选图 → 提交后台拆分任务 → 进度卡逐件点亮入橱（与衣橱页同一套机制） */
+  let uploading = false;   /* 提交进行中锁住 + 号，连点不再重复起付费任务 */
+  let localScan = false;   /* 离线回退的即时识别态 */
 
   function bindAdd() {
     $$("[data-add]").forEach(c => c.onclick = () => {
-      if (uploading) { toast("上一批还在处理中，稍等一下再传"); return; }
+      if (uploading) { toast("正在提交上一张，稍等一下再传"); return; }
       $("#fileInput").click();
     });
-  }
-
-  function setPct(i, p) {
-    const sp = splits[i];
-    if (!sp || sp.status !== "run") return;
-    sp.pct = Math.max(sp.pct, p);
-    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
-    if (pctEl) pctEl.textContent = sp.pct + "%";
-    if (barEl) barEl.style.width = sp.pct + "%";
-  }
-
-  async function finishOne(i, d) {
-    const sp = splits[i];
-    sp.stop?.();
-    sp.pct = 100;
-    const pctEl = $("#sppct" + i), barEl = $("#spbar" + i);
-    if (pctEl) pctEl.textContent = "100%";
-    if (barEl) barEl.style.width = "100%";
-    await new Promise(r => setTimeout(r, 380));
-    const item = {
-      id: "c" + Date.now() + "_" + i,
-      name: d.name || "我的单品",
-      cat: ["上衣", "下装", "鞋子", "连体裙"].includes(d.category) ? d.category : "上衣",
-      ph: "tee",
-      /* 生成图入橱前：裁白边+方形规整+压缩（trimToSquare） */
-      dataUrl: await trimToSquare(d.image || splitPhoto),
-      labels: d.labels || null,
-    };
-    const saved = Store.set({ customItems: [item, ...Store.get().customItems] });   /* 新完成排最前 */
-    sp.status = "done";
-    renderMineGrid(); syncAIBtn();
-    if (saved !== false) toast(`「${item.name}」已入橱`);
-    if (!splits.some(x => x.status === "run")) {
-      const ok = splits.filter(x => x.status === "done").length;
-      const fail = splits.filter(x => x.status === "fail").length;
-      if (ok > 1 || fail) toast(fail ? `${ok} 件已入橱，${fail} 件失败可点卡片重试` : `AI 拆分出 ${ok} 件，已全部入橱`);
-    }
-  }
-
-  function failOne(i) {
-    const sp = splits[i];
-    sp.stop?.();
-    sp.status = "fail";
-    renderMineGrid();
-  }
-
-  async function retrySplit(i) {
-    const sp = splits[i];
-    if (!sp || sp.status !== "fail" || !splitPhoto) return;
-    sp.status = "run"; sp.pct = 0;
-    renderMineGrid();
-    sp.stop = fakeProgress(p => setPct(i, p));
-    try {
-      const r = await AI.segmentOne(splitPhoto, sp.target);
-      finishOne(i, r.item);
-    } catch (e) {
-      console.warn("重试仍失败", e);
-      failOne(i);
-    }
   }
 
   $("#fileInput").addEventListener("change", e => {
@@ -658,27 +585,28 @@
       uploading = true;
       try {
         const small = await compressImage(reader.result);
-        splitPhoto = small;
-        detecting = true;
-        renderMineGrid();
-        toast("AI 正在识别衣服…");
-        await AI.splitUpload(small, {
-          onDetected(targets) {
-            detecting = false;
-            splits = targets.map(target => ({ target, pct: 0, status: "run", stop: null }));
-            renderMineGrid();
-            splits.forEach((sp, i) => { sp.stop = fakeProgress(p => setPct(i, p)); });
-            if (targets.length > 1) toast(`识别到 ${targets.length} 件衣服，AI 处理中…`);
-          },
-          onItemDone: (i, item) => finishOne(i, item),
-          onItemFail: (i, err) => { console.warn("单件生成失败", err); failOne(i); },
-        });
+        const r = await AI.segmentStart(small);
+        if (r.jobId) {
+          Store.set({ pendingSegments: [...(Store.get().pendingSegments || []), { jobId: r.jobId, ts: Date.now(), landed: [] }] });
+          renderMineGrid();
+          toast("上传成功，AI 正在整理");
+          pollSegmentJobs();   /* 立即拉一次，尽快出识别结果的进度卡 */
+        } else if (r.local) {
+          /* 离线回退：本地模拟即时入橱 */
+          localScan = true;
+          renderMineGrid();
+          await new Promise(rr => setTimeout(rr, 1200));
+          const items = await buildSegmentItems(r.local);
+          const saved = Store.set({ customItems: [...items, ...Store.get().customItems] });
+          localScan = false;
+          renderMineGrid(); syncAIBtn();
+          if (saved !== false) toast(items.length > 1 ? `AI 拆分出 ${items.length} 件，已入橱` : "已添加到衣橱");
+        }
       } catch (err) {
-        /* 识别这步就挂了：整次失败 */
-        console.warn("识别失败", err);
-        detecting = false;
+        console.warn("发起拆分失败", err);
+        localScan = false;
         renderMineGrid();
-        toast("识别失败，请重新上传");
+        toast("上传失败，请重新试一次");
       } finally {
         uploading = false;
       }
@@ -686,6 +614,9 @@
     reader.readAsDataURL(f);
     e.target.value = "";
   });
+
+  /* 后台任务状态推进/完成入橱后：本页在则实时刷新抽屉 */
+  window.addEventListener("segments-updated", () => { renderMineGrid(); syncAIBtn(); });
 
   /* 穿上单品：同分类替换，连体裙与上/下装互斥 */
   function wearItem(id) {
