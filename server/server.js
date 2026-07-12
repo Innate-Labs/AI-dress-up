@@ -1,5 +1,5 @@
 /* ============================================================
-   AI穿搭助手 · 轻量后端
+   美搭 · 轻量后端
    职责：1) 托管前端页面  2) 提供三个 AI 能力接口
    三个 AI 能力都在 server/ai/ 目录里，每个能力一个文件，
    现在是占位实现，后续把选定的模型 API 填进对应文件即可，
@@ -70,6 +70,6 @@ app.use(express.static(path.join(__dirname, ".."), {
 }));
 
 app.listen(PORT, () => {
-  console.log(`AI穿搭助手已启动 → http://localhost:${PORT}/login.html`);
+  console.log(`美搭已启动 → http://localhost:${PORT}/login.html`);
   console.log(`手机访问：同一 Wi-Fi 下用「电脑IP:${PORT}/login.html」`);
 });

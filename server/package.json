@@ -1,7 +1,7 @@
 {
   "name": "ai-wardrobe-server",
   "version": "1.0.0",
-  "description": "AI穿搭助手 · 轻量后端（静态服务 + AI 能力接口，模型 API 可替换）",
+  "description": "美搭 · 轻量后端（静态服务 + AI 能力接口，模型 API 可替换）",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
