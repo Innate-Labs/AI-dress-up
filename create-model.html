@@ -87,7 +87,7 @@
     aspect-ratio: .8; overflow: hidden;
     display: flex; align-items: flex-end; justify-content: center;
   }
-  .good img { max-height: 88%; }
+  .good img { width: 100%; height: 100%; object-fit: cover; }   /* 真实示例照铺满卡片 */
   .good .mk, .bad .mk {
     position: absolute; top: 0; left: 0;
     width: 26px; height: 26px;
@@ -103,7 +103,7 @@
     background: var(--fill); aspect-ratio: .74; overflow: hidden;
     display: flex; align-items: flex-end; justify-content: center;
   }
-  .bad img { max-height: 82%; opacity: .8; }
+  .bad img { width: 100%; height: 100%; object-fit: cover; opacity: .8; }
   .bad .mk { background: var(--danger); width: 22px; height: 22px; font-size: 11px; }
   .bad .lbl { font-size: 10.5px; padding: 4px 0; }
   .sheet-note { font-size: 12px; color: var(--muted); text-align: center; line-height: 1.8; margin-top: 14px; }
@@ -164,15 +164,16 @@
     <button class="sheet-x" onclick="closeSheet('sheetTip')">✕</button>
   </div>
   <p class="tip-sub">请上传一张正面、半身或全身照，需穿着贴身衣物。</p>
+  <!-- 示例图放 assets/ph/，文件名固定如下（jpg）；缺图时自动回退灰剪影 -->
   <div class="good-grid">
-    <div class="good"><span class="mk">✓</span><img src="assets/ph/model.svg"><span class="lbl">全身照</span></div>
-    <div class="good"><span class="mk">✓</span><img src="assets/ph/model.svg" style="transform:scale(1.7) translateY(18%)"><span class="lbl">半身照</span></div>
+    <div class="good"><span class="mk">✓</span><img src="assets/ph/tip-good-full.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">全身照</span></div>
+    <div class="good"><span class="mk">✓</span><img src="assets/ph/tip-good-half.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">半身照</span></div>
   </div>
   <div class="bad-grid">
-    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scale(2.6) translateY(34%)"><span class="lbl">局部特写</span></div>
-    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:rotate(-18deg)"><span class="lbl">复杂动作</span></div>
-    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scaleX(-.6)"><span class="lbl">非正面</span></div>
-    <div class="bad"><span class="mk">✕</span><img src="assets/ph/model.svg" style="transform:scaleY(1.15)"><span class="lbl">遮挡过多</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/tip-bad-closeup.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">局部特写</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/tip-bad-pose.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">复杂动作</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/tip-bad-side.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">非正面</span></div>
+    <div class="bad"><span class="mk">✕</span><img src="assets/ph/tip-bad-cover.jpg" onerror="this.onerror=null;this.src='assets/ph/model.svg'"><span class="lbl">遮挡过多</span></div>
   </div>
   <button class="btn btn-primary btn-block" id="btnCam" style="margin-bottom:12px">📷 现在拍一张</button>
   <button class="btn btn-soft btn-block" id="btnAlbum">🖼 打开相册</button>

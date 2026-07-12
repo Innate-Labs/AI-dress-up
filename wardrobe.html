@@ -98,13 +98,15 @@
   let scanning = false;   /* 上传后 AI 识别中：网格最前显示占位卡 */
   function renderCats() {
     const items = wardrobeItems();
+    /* 分类空态兜底 emoji：按分类给对应图标（连体裙不再显示衬衫） */
+    const CAT_EMOJI = { "全部": "👕", "上衣": "👕", "下装": "👖", "鞋子": "👟", "连体裙": "👗" };
     $("#catbar").innerHTML = CATS.map(c => {
       const list = c === "全部" ? items : items.filter(i => i.cat === c);
       const cover = list[0];
       return `
       <div class="catdot ${c === cat ? "on" : ""}" data-c="${c}">
         <div class="cir">
-          ${cover ? (cover.dataUrl ? `<img src="${cover.dataUrl}">` : itemImg(cover)) : "👕"}
+          ${cover ? (cover.dataUrl ? `<img src="${cover.dataUrl}">` : itemImg(cover)) : (CAT_EMOJI[c] || "👕")}
           <span class="badge">${list.length}</span>
         </div>
         <span class="lbl">${c}</span>
