@@ -68,6 +68,8 @@
     display: flex; align-items: center; gap: 6px;
     box-shadow: var(--shadow-float);
   }
+  /* ✦ 星标单独控制大小并与文字垂直居中（跟随字号在部分手机上偏小且不齐） */
+  .ai-match .star { font-size: 17px; line-height: 1; display: inline-block; }
   .ai-match.off {
     background-image: linear-gradient(var(--card), var(--card)),
       linear-gradient(96deg, #dcdcd9, #dcdcd9);
@@ -104,7 +106,17 @@
     z-index: 4; position: relative;
     min-height: 0;
   }
-  .drawer .grab { width: 42px; height: 4.5px; border-radius: 3px; background: rgba(255,255,255,.22); margin: 10px auto 4px; }
+  /* 抽屉把手：可按住上下拖动（横线是视觉，外层是 22px 高的手势热区） */
+  .drawer .grab {
+    display: flex; align-items: center; justify-content: center;
+    height: 22px; margin: 4px 0 0;
+    touch-action: none; cursor: grab;
+  }
+  .drawer .grab::before {
+    content: ""; width: 42px; height: 4.5px; border-radius: 3px;
+    background: rgba(255,255,255,.22);
+  }
+  .stage.snap { transition: height .25s ease; }
   .dtabs { display: flex; justify-content: center; gap: 44px; padding: 8px 0 2px; }
   .dtabs button {
     background: none; border: none; cursor: pointer;
@@ -117,7 +129,7 @@
     content: ""; position: absolute; left: 50%; transform: translateX(-50%); bottom: -3px;
     width: 24px; height: 3px; border-radius: 2px; background: #fff;
   }
-  .dchips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 14px var(--pad) 4px; }
+  .dchips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 14px var(--pad) 10px; }
   .dchips::-webkit-scrollbar { display: none; }
   .dchip {
     flex: none; border: none; cursor: pointer;
@@ -138,9 +150,11 @@
   .dgrid.pt { padding-top: 18px; }
   .dcell {
     background: #fff; border-radius: 14px;
-    aspect-ratio: .86; padding: 10px;
+    /* 固定高度：不用 aspect-ratio（部分手机浏览器按图片内容撑高，衣服卡会比+号卡高） */
+    height: 124px; padding: 10px;
     cursor: pointer; position: relative;
     border: 2px solid transparent;
+    overflow: hidden;
   }
   .dcell.on {
     border: 3px solid transparent;
@@ -177,7 +191,7 @@
       <button class="iconbtn" id="btnFav" title="收藏">★</button>
     </div>
 
-    <button class="btn ai-pill ai-match" id="btnAI">✦ AI 搭配我的衣服</button>
+    <button class="btn ai-pill ai-match" id="btnAI"><span class="star">✦</span> AI 搭配我的衣服</button>
     <div class="gen-loading" id="genLoading"><div class="spinner"></div><div class="gen-text">✦ 穿搭生成中，请耐心等待…</div></div>
   </div>
 
@@ -608,7 +622,7 @@
     const btn = $("#btnAI");
     if (btn.disabled) return;            /* 搭配请求进行中，连点不再重复调用付费模型 */
     btn.disabled = true;
-    btn.textContent = "✦ AI 搭配中…";
+    btn.innerHTML = '<span class="star">✦</span> AI 搭配中…';
     try {
       const r = await AI.recommend(wardrobeItems(), around);
       if (r.items && r.items.length) {
@@ -624,7 +638,7 @@
       }
     } finally {
       btn.disabled = false;
-      btn.innerHTML = "✦ AI 搭配我的衣服";
+      btn.innerHTML = '<span class="star">✦</span> AI 搭配我的衣服';
     }
   }
 
@@ -662,6 +676,35 @@
     $("#paneOutfit").classList.toggle("hidden", t !== "outfit");
     $("#paneOutfit").style.display = t === "outfit" ? "flex" : "none";
   }));
+
+  /* ---------- 抽屉把手拖拽：按住横线上拉看更多衣服，下拉回到默认高度为极限 ---------- */
+  const stageEl = $(".stage");
+  const grabEl = $(".drawer .grab");
+  const stageMax = () => Math.round(window.innerHeight * 0.56);  /* 默认高度 = CSS 的 56dvh */
+  const stageMin = () => Math.round(window.innerHeight * 0.24);  /* 拉满时模特区收到 24dvh */
+  let gDrag = null;
+  grabEl.addEventListener("pointerdown", e => {
+    gDrag = { y: e.clientY, h: stageEl.getBoundingClientRect().height };
+    stageEl.classList.remove("snap");
+    grabEl.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  grabEl.addEventListener("pointermove", e => {
+    if (!gDrag) return;
+    const h = Math.min(stageMax(), Math.max(stageMin(), gDrag.h + (e.clientY - gDrag.y)));
+    stageEl.style.height = h + "px";
+  });
+  const gEnd = () => {
+    if (!gDrag) return;
+    gDrag = null;
+    /* 松手吸附到更近的一端 */
+    const h = stageEl.getBoundingClientRect().height;
+    const to = (h - stageMin() < stageMax() - h) ? stageMin() : stageMax();
+    stageEl.classList.add("snap");
+    stageEl.style.height = to + "px";
+  };
+  grabEl.addEventListener("pointerup", gEnd);
+  grabEl.addEventListener("pointercancel", gEnd);
 
   function renderAll() {
     renderStage(); renderOutfitGrid(); renderMineGrid(); renderModelBadge(); syncFav(); syncAIBtn();
