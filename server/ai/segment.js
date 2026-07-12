@@ -26,13 +26,14 @@
    （注意平铺图现在走 DashScope，非 OpenRouter；换回 OpenRouter 图像模型需改本文件 qwenImageEdit）
    ============================================================ */
 
-const { OPENROUTER_API_KEY, DASHSCOPE_API_KEY, MODELS } = require("./config");
+const { OPENROUTER_API_KEY, DASHSCOPE_API_KEY, DASHSCOPE_API_BASE, MODELS } = require("./config");
 const { chat, imageMessage, parseJson } = require("./openrouter");
 const { DETECT_PROMPT, flatImagePrompt, TAG_PROMPT, CAT_MAP, mapScene } = require("./prompts");
 
 /* qwen-image-edit（DashScope 百炼）：参考图 + 指令 → 单品平铺图 dataURL。
-   同步接口；遇限流(Throttling)退避重试最多3次；返回URL仅24h有效，需下载转 base64 持久化。 */
-const DASHSCOPE_IMG_API = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation";
+   同步接口；遇限流(Throttling)退避重试最多3次；返回URL仅24h有效，需下载转 base64 持久化。
+   域名走 config 的 DASHSCOPE_API_BASE（业务空间密钥须配专属域名） */
+const DASHSCOPE_IMG_API = `${DASHSCOPE_API_BASE}/api/v1/services/aigc/multimodal-generation/generation`;
 /* 带超时的 fetch：避免 DashScope 卡住时请求永久挂起 */
 async function fetchT(url, opts, timeoutMs) {
   const ctrl = new AbortController();

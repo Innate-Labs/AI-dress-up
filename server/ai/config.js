@@ -17,6 +17,10 @@ const path = require("path");
 module.exports = {
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || "",
   DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY || "",
+  /* DashScope 调用域名：默认公共域名；用百炼「业务空间」的 sk-ws- 密钥时，
+     必须在 .env 配 DASHSCOPE_API_BASE 为该空间的专属域名（ws-xxx.区域.maas.aliyuncs.com），
+     打公共域名会报 InvalidApiKey */
+  DASHSCOPE_API_BASE: (process.env.DASHSCOPE_API_BASE || "https://dashscope.aliyuncs.com").replace(/\/+$/, ""),
 
   /* 模型名集中在这里，替换模型只改这一处 */
   MODELS: {
