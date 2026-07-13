@@ -73,6 +73,8 @@ const Store = {
   },
   set(patch) {
     this._cache = { ...this.get(), ...patch };
+    /* 轻量资料变化后防抖同步到云端（仅登录用户、仅小数据，见文件末 syncLightState） */
+    if (typeof pushLightState === "function") pushLightState();
     /* localStorage 约 5MB 且每次整份重写，塞满时 setItem 会抛异常中断当前操作。
        兜底：从最老的试衣间快照开始丢（占空间的主要是图），腾出地方再存；
        全丢完还存不下就提示用户，页面继续用内存数据跑，不再中断流程。
@@ -500,3 +502,49 @@ const fmtTime = ts => {
   const d = new Date(ts);
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 };
+
+/* ---------- 轻量资料云端同步（Supabase，仅登录用户）----------
+   只同步"小数据"：账号(昵称/头像/邮箱)、造型档案、偏好、收藏、衣橱选择、引导状态。
+   用户上传的照片、模特照、试穿图（customItems/models/history 里的大 base64）不上云。
+   push：本地变化后防抖存云端；pull：登录时拉回（login.html 调用）。
+   未登录或后端没配 Supabase 时静默无操作。 */
+const LIGHT_KEYS = ["profile", "favorites", "wardrobe", "deletedItems", "onboarded", "privacyOk", "curModel"];
+function lightState() {
+  const s = Store.get(), a = s.account || {};
+  const out = { account: { nick: a.nick || "", avatar: a.avatar || "", email: a.email || "" } };  /* 不含 token */
+  LIGHT_KEYS.forEach(k => { out[k] = s[k]; });
+  return out;
+}
+let _pushTimer = null;
+function pushLightState() {
+  const token = (Store.get().account || {}).token;
+  if (!token) return;                     /* 未登录不同步 */
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => {
+    fetch("/api/state/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ state: lightState() }),
+    }).catch(() => {});                   /* 同步失败不打扰，本地数据照常用 */
+  }, 1500);
+}
+async function pullLightState() {
+  const token = (Store.get().account || {}).token;
+  if (!token) return;
+  try {
+    const resp = await fetch("/api/state/pull", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) return;
+    const { state } = await resp.json();
+    if (!state) return;                   /* 云端还没这账号的资料（新用户）→ 不动本地 */
+    const patch = {};
+    LIGHT_KEYS.forEach(k => { if (state[k] !== undefined) patch[k] = state[k]; });
+    if (state.account) {
+      const a = Store.get().account || {};   /* 保留本地 token，其余用云端 */
+      patch.account = { ...a, nick: state.account.nick || a.nick, avatar: state.account.avatar || a.avatar, email: state.account.email || a.email };
+    }
+    Store.set(patch);
+  } catch {}
+}

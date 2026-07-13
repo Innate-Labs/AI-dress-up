@@ -16,6 +16,7 @@ const tryon = require("./ai/tryon");
 const recommend = require("./ai/recommend");
 const validate = require("./ai/validate");
 const store = require("./store");
+const supa = require("./supabase");
 const { verifyToken } = require("./auth");
 
 const app = express();
@@ -62,6 +63,29 @@ app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 /* 邮箱验证码登录（发码/登录，详见 server/auth.js） */
 app.use(require("./auth").router);
+
+/* ---------- 轻量用户资料云端同步（Supabase，仅登录用户）----------
+   pull：登录后拉回该账号云端资料（换设备/清缓存后找回）
+   push：本地轻量数据变化后存回云端
+   未配 Supabase 时返回 disabled，前端静默跳过（纯 localStorage 行为不变） */
+app.post("/api/state/pull", requireLogin, async (req, res) => {
+  if (!supa.enabled) return res.json({ state: null, disabled: true });
+  try {
+    const row = await supa.getState(req.userEmail);
+    res.json({ state: row ? row.state : null, updatedAt: row ? row.updated_at : null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+app.post("/api/state/push", requireLogin, async (req, res) => {
+  if (!supa.enabled) return res.json({ ok: false, disabled: true });
+  try {
+    await supa.saveState(req.userEmail, req.body.state || {});
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 /* 照片质检：创建模特前判断照片是否合格 */
 app.post("/api/validate-photo", async (req, res) => {

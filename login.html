@@ -140,6 +140,8 @@
       /* 登录态写进账号资料：账号页展示邮箱，重置演示数据时一并登出 */
       const acc = Store.get().account || {};
       Store.set({ account: { ...acc, email, token } });
+      /* 拉回该账号云端的轻量资料（换设备/清缓存后找回档案/收藏/衣橱选择） */
+      await pullLightState();
       toast("登录成功");
       setTimeout(() => {
         location.href = Store.get().onboarded ? "home.html" : "onboarding.html";

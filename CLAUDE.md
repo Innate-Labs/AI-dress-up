@@ -86,6 +86,11 @@ profile.html        我的：收藏（与首页同款卡片，星标为已选中
   删除系统单品记入 `deletedItems`，含它的搭配全站隐藏
 - 运行时状态存 localStorage（key `aiwd-state`），通过 `Store.get()/Store.set()` 读写：
   衣橱、收藏、试衣历史、用户上传的单品和模特照片、引导问卷答案
+- 登录用户的**轻量资料**（账号昵称/头像/邮箱、造型档案、偏好、收藏、衣橱选择、引导状态，
+  `LIGHT_KEYS` in js/app.js）额外同步到 Supabase：登录时 `pullLightState()` 拉回、变化时
+  `pushLightState()` 防抖存回，换设备/清缓存重登可找回。大文件（上传照片/试穿图）仍只在本机。
+  后端走 `/api/state/*` + `server/supabase.js`（service key 只在服务端）；未配 `SUPABASE_*`
+  环境变量时静默跳过、行为不变
 - 图片机制：单品图先找 `assets/real/<id>.png` → `.jpg` → 回退到 `assets/ph/<剪影>.svg` 占位图。
   给页面加单品图一律用 `itemImg(item)`，不要手写 `<img>`
 
